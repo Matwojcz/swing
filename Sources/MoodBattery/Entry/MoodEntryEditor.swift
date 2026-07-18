@@ -8,6 +8,8 @@ struct MoodEntryEditor: View {
     @State private var note: String = ""
     @State private var saveError: String?
 
+    var onSave: (() -> Void)?
+
     private let store = MoodEntryStore()
 
     var body: some View {
@@ -35,7 +37,6 @@ struct MoodEntryEditor: View {
             }
         }
         .padding(24)
-        .frame(minWidth: 360, minHeight: 480)
     }
 
     private var header: some View {
@@ -90,6 +91,7 @@ struct MoodEntryEditor: View {
             try store.save(entry)
             note = ""
             saveError = nil
+            onSave?()
         } catch {
             saveError = "Couldn't save: \(error.localizedDescription)"
         }

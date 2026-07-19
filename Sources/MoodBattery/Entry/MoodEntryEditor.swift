@@ -17,7 +17,7 @@ struct MoodEntryEditor: View {
             header
 
             HStack(alignment: .center, spacing: 20) {
-                TankView(energy: energy, flavour: flavour, onEnergyChange: { energy = $0 })
+                GaugeView(energy: energy, flavour: flavour, onEnergyChange: { energy = $0 })
                 flavourSlider
             }
             .frame(height: 220)

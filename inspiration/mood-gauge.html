@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mood gauge (reference)</title>
+<style>
+  :root {
+    --surface-1: #f4f3ef;
+    --border-strong: #444441;
+    --text-secondary: #5f5e5a;
+    --text-muted: #888780;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #2c2c2a;
+      --border-strong: #b4b2a9;
+      --text-secondary: #b4b2a9;
+      --text-muted: #888780;
+    }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: transparent;
+    margin: 0;
+    padding: 2rem 1rem;
+    display: flex;
+    justify-content: center;
+  }
+  .wrap { max-width: 420px; width: 100%; }
+  input[type="range"] { width: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="text-align: center; margin-bottom: 0.5rem;">
+    <div style="font-size: 13px; color: var(--text-secondary);" id="state-label">baseline</div>
+    <div style="font-size: 28px; font-weight: 500;" id="val-out">50</div>
+  </div>
+
+  <div style="display: flex; justify-content: center; align-items: flex-end; gap: 18px;">
+    <div style="position: relative; width: 320px; height: 210px;">
+      <svg id="gauge" width="320" height="210" viewBox="0 0 320 210"></svg>
+      <div id="sparkzone" style="position: absolute; inset: 0; pointer-events: none;"></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; height: 150px; justify-content: center; margin-bottom: 10px;">
+      <span style="font-size: 11px; color: var(--text-secondary); writing-mode: vertical-rl; transform: rotate(180deg);">happy</span>
+      <div style="width: 30px; height: 110px; display: flex; align-items: center; justify-content: center;">
+        <input type="range" id="flavor" min="0" max="100" value="0" style="width: 110px; transform: rotate(90deg);" />
+      </div>
+      <span style="font-size: 11px; color: var(--text-secondary); writing-mode: vertical-rl;">irritable</span>
+    </div>
+  </div>
+
+  <input type="range" min="0" max="100" step="1" value="50" id="slider" style="margin-top: 0.5rem;" />
+  <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+    <span>depressive</span>
+    <span>baseline</span>
+    <span>hype</span>
+  </div>
+</div>
+
+<script>
+// NOTE: the logic below is duplicated inline from mood-gauge-logic.js
+// so this file works standalone (opening it directly, with no local
+// server, sometimes silently blocks loading a separate local <script
+// src>). mood-gauge-logic.js remains the canonical copy for porting —
+// if you edit the math, edit both, or better, delete this inline copy
+// and serve the two files from a real local server instead.
+
+const M = (function() {
+  const LOW_STOPS = [
+    [0, [18, 18, 18]],
+    [20, [83, 74, 183]],
+    [50, [55, 138, 221]],
+  ];
+  const HAPPY_HIGH_STOPS = [
+    [50, [55, 138, 221]],
+    [75, [239, 159, 39]],
+    [100, [216, 90, 48]],
+  ];
+  const IRRITABLE_HIGH_STOPS = [
+    [50, [55, 138, 221]],
+    [75, [226, 75, 74]],
+    [100, [153, 53, 86]],
+  ];
+  const REDLINE_COLOR = [194, 59, 58];
+  const REDLINE_THRESHOLD = 88;
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function interpolateStops(stops, v) {
+    let lo = stops[0], hi = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (v >= stops[i][0] && v <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break; }
+    }
+    const span = hi[0] - lo[0] || 1;
+    const t = (v - lo[0]) / span;
+    return lo[1].map((c0, i) => lerp(c0, hi[1][i], t));
+  }
+
+  function colorAt(v, flavor) {
+    if (v <= 50) return interpolateStops(LOW_STOPS, v);
+    const happy = interpolateStops(HAPPY_HIGH_STOPS, v);
+    const irritable = interpolateStops(IRRITABLE_HIGH_STOPS, v);
+    const t = flavor / 100;
+    return happy.map((c0, i) => lerp(c0, irritable[i], t));
+  }
+
+  function colorAtRounded(v, flavor) { return colorAt(v, flavor).map(Math.round); }
+  function rgbToCss([r, g, b]) { return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`; }
+  function valueToAngleDeg(v) { return 180 - (v / 100) * 180; }
+
+  function polarPoint(v, radius, cx, cy) {
+    const theta = (valueToAngleDeg(v) * Math.PI) / 180;
+    return { x: cx + radius * Math.cos(theta), y: cy - radius * Math.sin(theta) };
+  }
+
+  function stateLabel(v, flavor) {
+    const flavorTag = flavor < 35 ? 'happy' : flavor > 65 ? 'irritable' : 'mixed';
+    if (v < 8) return 'depressive';
+    if (v < 20) return 'low, heading depressive';
+    if (v < 45) return 'low';
+    if (v <= 55) return 'baseline';
+    if (v < 75) return 'charged up';
+    if (v < REDLINE_THRESHOLD) return `high energy, ${flavorTag}`;
+    return `redline, ${flavorTag}`;
+  }
+
+  function isRedline(v) { return v >= REDLINE_THRESHOLD; }
+
+  return {
+    REDLINE_COLOR, REDLINE_THRESHOLD, colorAt, colorAtRounded, rgbToCss,
+    valueToAngleDeg, polarPoint, stateLabel, isRedline,
+  };
+})();
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('gauge');
+const slider = document.getElementById('slider');
+const flavorSlider = document.getElementById('flavor');
+const valOut = document.getElementById('val-out');
+const stateLabelEl = document.getElementById('state-label');
+const sparkzone = document.getElementById('sparkzone');
+
+const cx = 160, cy = 190;
+const R_INNER = 108, R_OUTER = 138;
+const NEEDLE_LEN = 122;
+const TICKS = 100;
+
+function el(tag, attrs) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+let bandGroup, redlineGroup, needle, hub;
+
+function buildStatic() {
+  svg.innerHTML = '';
+  bandGroup = el('g', {});
+  redlineGroup = el('g', {});
+  svg.appendChild(bandGroup);
+  svg.appendChild(redlineGroup);
+
+  // baseline diagram tick, extends past the band
+  const p1 = M.polarPoint(50, R_INNER - 14, cx, cy);
+  const p2 = M.polarPoint(50, R_OUTER + 18, cx, cy);
+  svg.appendChild(el('line', {
+    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+    stroke: '#ffffff', 'stroke-width': 1, 'stroke-dasharray': '4,4'
+  }));
+
+  needle = el('line', { x1: cx, y1: cy, x2: cx, y2: cy - NEEDLE_LEN, stroke: '#e8e6df', 'stroke-width': 3, 'stroke-linecap': 'round' });
+  svg.appendChild(needle);
+
+  hub = el('circle', { cx: cx, cy: cy, r: 9, fill: '#e8e6df', stroke: 'var(--border-strong)', 'stroke-width': 2 });
+  svg.appendChild(hub);
+}
+
+function renderBand(flavor) {
+  bandGroup.innerHTML = '';
+  for (let i = 0; i <= TICKS; i++) {
+    const v = (i / TICKS) * 100;
+    const p1 = M.polarPoint(v, R_INNER, cx, cy);
+    const p2 = M.polarPoint(v, R_OUTER, cx, cy);
+    const c = M.colorAtRounded(v, flavor);
+    bandGroup.appendChild(el('line', {
+      x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      stroke: M.rgbToCss(c), 'stroke-width': 3
+    }));
+  }
+
+  redlineGroup.innerHTML = '';
+  for (let i = 0; i <= 24; i++) {
+    const v = 88 + (i / 24) * 12;
+    const p1 = M.polarPoint(v, R_OUTER + 5, cx, cy);
+    const p2 = M.polarPoint(v, R_OUTER + 15, cx, cy);
+    redlineGroup.appendChild(el('line', {
+      x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      stroke: M.rgbToCss(M.REDLINE_COLOR), 'stroke-width': 2.5
+    }));
+  }
+}
+
+let sparkInterval = null;
+
+function spawnSpark(x, y, color, dirAngleDeg) {
+  const spark = document.createElement('div');
+  const jitter = (Math.random() - 0.5) * 50;
+  const angle = (dirAngleDeg + jitter) * Math.PI / 180;
+  const dist = 26 + Math.random() * 20;
+  spark.style.position = 'absolute';
+  spark.style.left = x + 'px';
+  spark.style.top = y + 'px';
+  spark.style.width = '5px';
+  spark.style.height = '5px';
+  spark.style.borderRadius = '50%';
+  spark.style.background = color;
+  sparkzone.appendChild(spark);
+  const anim = spark.animate([
+    { transform: 'translate(0px, 0px)', opacity: 1 },
+    { transform: 'translate(' + Math.cos(angle) * dist + 'px,' + (-Math.sin(angle) * dist) + 'px)', opacity: 0 }
+  ], { duration: 550, easing: 'ease-out' });
+  anim.onfinish = function() { spark.remove(); };
+}
+
+function update() {
+  const v = Number(slider.value);
+  const flavor = Number(flavorSlider.value);
+
+  renderBand(flavor);
+
+  const tip = M.polarPoint(v, NEEDLE_LEN, cx, cy);
+  needle.setAttribute('x2', tip.x);
+  needle.setAttribute('y2', tip.y);
+
+  const color = M.rgbToCss(M.colorAtRounded(v, flavor));
+  needle.setAttribute('stroke', v >= M.REDLINE_THRESHOLD ? '#f2f0e9' : '#e8e6df');
+  hub.setAttribute('fill', color);
+
+  valOut.textContent = v;
+  stateLabelEl.textContent = M.stateLabel(v, flavor);
+
+  if (M.isRedline(v)) {
+    if (!sparkInterval) {
+      sparkInterval = setInterval(function() {
+        const vv = Number(slider.value);
+        const ff = Number(flavorSlider.value);
+        const t = M.polarPoint(vv, NEEDLE_LEN, cx, cy);
+        const cc = M.colorAtRounded(vv, ff);
+        spawnSpark(t.x, t.y, M.rgbToCss(cc), M.valueToAngleDeg(vv));
+      }, 120);
+    }
+  } else if (sparkInterval) {
+    clearInterval(sparkInterval);
+    sparkInterval = null;
+  }
+}
+
+buildStatic();
+slider.addEventListener('input', update);
+flavorSlider.addEventListener('input', update);
+update();
+</script>
+</body>
+</html>

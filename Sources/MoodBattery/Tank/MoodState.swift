@@ -11,6 +11,6 @@ enum MoodState {
         if energy <= 55 { return "baseline" }
         if energy < 75 { return "charged up" }
         if energy < 88 { return "high energy, \(flavourTag)" }
-        return "redline, \(flavourTag)"
+        return "hype phase, \(flavourTag)"
     }
 }

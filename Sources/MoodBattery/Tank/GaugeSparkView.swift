@@ -11,9 +11,9 @@ struct GaugeSparkView: View {
 
     private let sparkCount = 5
     private let cycleDuration: Double = 0.55
-    private let sparkDiameter: CGFloat = 5
+    private let sparkDiameter: CGFloat = 5 * GaugeView.scale
     private let angleOffsets: [Double] = [-25, -10, 0, 10, 25]
-    private let distances: [CGFloat] = [30, 38, 34, 42, 46]
+    private let distances: [CGFloat] = [30, 38, 34, 42, 46].map { $0 * GaugeView.scale }
 
     var body: some View {
         TimelineView(.animation) { context in

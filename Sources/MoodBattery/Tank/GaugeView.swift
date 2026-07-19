@@ -13,15 +13,30 @@ struct GaugeView: View {
     var flavour: Double
     var onEnergyChange: ((Double) -> Void)? = nil
 
-    private let width: CGFloat = 320
-    private let height: CGFloat = 210
-    private let cx: CGFloat = 160
-    private let cy: CGFloat = 190
-    private let innerRadius: CGFloat = 108
-    private let outerRadius: CGFloat = 138
-    private let needleLength: CGFloat = 122
-    private let redlineThreshold: Double = 88
+    /// Reference geometry (from mood-gauge.html) scaled up 20% — the dial
+    /// read too small next to the rest of the entry screen.
+    static let scale: CGFloat = 1.2
+    static let width: CGFloat = 320 * scale
+    static let height: CGFloat = 210 * scale
+    private static let cx: CGFloat = 160 * scale
+    private static let cy: CGFloat = 190 * scale
+    private static let innerRadius: CGFloat = 108 * scale
+    private static let outerRadius: CGFloat = 138 * scale
+    private static let needleLength: CGFloat = 122 * scale
+    private static let redlineThreshold: Double = 88
+    /// Top of the dashed baseline tick, measured from this view's own top
+    /// edge — exposed so sibling layout (the flavour slider) can align to it.
+    static let baselineTopY: CGFloat = cy - (outerRadius + 18 * scale)
+
     private let redlineColor = Color(red: 194 / 255, green: 59 / 255, blue: 58 / 255)
+    private var redlineThreshold: Double { Self.redlineThreshold }
+    private var width: CGFloat { Self.width }
+    private var height: CGFloat { Self.height }
+    private var cx: CGFloat { Self.cx }
+    private var cy: CGFloat { Self.cy }
+    private var innerRadius: CGFloat { Self.innerRadius }
+    private var outerRadius: CGFloat { Self.outerRadius }
+    private var needleLength: CGFloat { Self.needleLength }
 
     private var fillColor: Color {
         MoodColor.color(energy: energy, flavour: flavour)
@@ -82,7 +97,7 @@ struct GaugeView: View {
             var path = Path()
             path.move(to: point(for: v, radius: innerRadius))
             path.addLine(to: point(for: v, radius: outerRadius))
-            context.stroke(path, with: .color(MoodColor.color(energy: v, flavour: flavour)), lineWidth: 3)
+            context.stroke(path, with: .color(MoodColor.color(energy: v, flavour: flavour)), lineWidth: 3 * Self.scale)
         }
     }
 
@@ -93,7 +108,7 @@ struct GaugeView: View {
         context.stroke(
             path,
             with: .color(.white.opacity(0.9)),
-            style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+            style: StrokeStyle(lineWidth: 1 * Self.scale, dash: [4 * Self.scale, 4 * Self.scale])
         )
     }
 
@@ -104,7 +119,7 @@ struct GaugeView: View {
             var path = Path()
             path.move(to: point(for: v, radius: outerRadius + 5))
             path.addLine(to: point(for: v, radius: outerRadius + 15))
-            context.stroke(path, with: .color(redlineColor), lineWidth: 2.5)
+            context.stroke(path, with: .color(redlineColor), lineWidth: 2.5 * Self.scale)
         }
     }
 
@@ -115,14 +130,15 @@ struct GaugeView: View {
         let strokeColor: Color = energy >= redlineThreshold
             ? Color(red: 242 / 255, green: 240 / 255, blue: 233 / 255)
             : Color(red: 232 / 255, green: 230 / 255, blue: 223 / 255)
-        context.stroke(path, with: .color(strokeColor), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+        context.stroke(path, with: .color(strokeColor), style: StrokeStyle(lineWidth: 3 * Self.scale, lineCap: .round))
     }
 
     private func drawHub(in context: GraphicsContext) {
-        let rect = CGRect(x: cx - 9, y: cy - 9, width: 18, height: 18)
+        let hubRadius = 9 * Self.scale
+        let rect = CGRect(x: cx - hubRadius, y: cy - hubRadius, width: hubRadius * 2, height: hubRadius * 2)
         let path = Path(ellipseIn: rect)
         context.fill(path, with: .color(fillColor))
-        context.stroke(path, with: .color(.tankBorder), lineWidth: 2)
+        context.stroke(path, with: .color(.tankBorder), lineWidth: 2 * Self.scale)
     }
 
     // MARK: - Drag

@@ -12,15 +12,22 @@ struct HistoryListView: View {
                 Text("No entries yet")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: 8) {
-                        ForEach(entries) { entry in
-                            HistoryEntryRow(entry: entry)
+                GeometryReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            Spacer(minLength: 40)
+                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                                HistoryEntryRow(entry: entry)
+                                if index < entries.count - 1 {
+                                    Spacer(minLength: 8)
+                                }
+                            }
+                            Spacer(minLength: 40)
                         }
+                        .frame(minHeight: proxy.size.height)
                     }
-                    .padding(.vertical, 60)
                 }
                 .mask(fadeMask)
             }

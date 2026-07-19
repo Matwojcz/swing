@@ -6,13 +6,14 @@ struct ContentView: View {
     private let store = MoodEntryStore()
 
     var body: some View {
-        VStack(spacing: 24) {
-            HStack(alignment: .top, spacing: 32) {
+        HStack(alignment: .top, spacing: 32) {
+            VStack(alignment: .leading, spacing: 24) {
                 MoodEntryEditor(onSave: reload)
-                HistoryListView(entries: entries)
-                    .frame(width: 220, height: 320)
+                WeeklyDiagramView(entries: entries)
+                    .padding(.leading, 24)
             }
-            WeeklyDiagramView(entries: entries)
+            HistoryListView(entries: entries)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(24)
         .onAppear(perform: reload)

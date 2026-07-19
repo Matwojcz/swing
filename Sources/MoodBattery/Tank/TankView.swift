@@ -7,6 +7,10 @@ import SwiftUI
 struct TankView: View {
     var energy: Double
     var flavour: Double
+    /// When set, the tank becomes draggable: dragging (or tapping) anywhere
+    /// on it reports a new 0...100 energy value. Left `nil`, the tank is
+    /// purely a display, e.g. for read-only summary views.
+    var onEnergyChange: ((Double) -> Void)? = nil
 
     private let width: CGFloat = 140
     private let height: CGFloat = 220
@@ -18,6 +22,18 @@ struct TankView: View {
     }
 
     var body: some View {
+        Group {
+            if let onEnergyChange {
+                tankStack
+                    .contentShape(Rectangle())
+                    .gesture(dragGesture(onEnergyChange))
+            } else {
+                tankStack
+            }
+        }
+    }
+
+    private var tankStack: some View {
         ZStack {
             cap
             tankBody
@@ -29,6 +45,14 @@ struct TankView: View {
             }
         }
         .frame(width: width, height: height)
+    }
+
+    private func dragGesture(_ onEnergyChange: @escaping (Double) -> Void) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let fraction = 1 - Double(value.location.y / height)
+                onEnergyChange((min(max(fraction, 0), 1) * 100).rounded())
+            }
     }
 
     private var cap: some View {

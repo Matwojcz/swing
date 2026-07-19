@@ -17,12 +17,10 @@ struct MoodEntryEditor: View {
             header
 
             HStack(alignment: .center, spacing: 20) {
-                TankView(energy: energy, flavour: flavour)
+                TankView(energy: energy, flavour: flavour, onEnergyChange: { energy = $0 })
                 flavourSlider
             }
             .frame(height: 220)
-
-            energySlider
 
             TextField("Note (optional)", text: $note)
                 .textFieldStyle(.roundedBorder)

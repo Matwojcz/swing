@@ -6,10 +6,13 @@ struct ContentView: View {
     private let store = MoodEntryStore()
 
     var body: some View {
-        HStack(alignment: .top, spacing: 32) {
-            MoodEntryEditor(onSave: reload)
-            HistoryListView(entries: entries)
-                .frame(width: 220, height: 320)
+        VStack(spacing: 24) {
+            HStack(alignment: .top, spacing: 32) {
+                MoodEntryEditor(onSave: reload)
+                HistoryListView(entries: entries)
+                    .frame(width: 220, height: 320)
+            }
+            WeeklyDiagramView(entries: entries)
         }
         .padding(24)
         .onAppear(perform: reload)

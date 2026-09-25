@@ -2,7 +2,7 @@ name: MoodBattery
 options:
   bundleIdPrefix: com.matwojcz
   deploymentTarget:
-    macOS: "12.0"
+    macOS: "14.0"
 packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift.git
@@ -27,5 +27,5 @@ targets:
       path: Sources/MoodBattery/Info.plist
       properties:
         CFBundleDisplayName: Mood Battery
-        LSMinimumSystemVersion: "12.0"
+        LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: ""

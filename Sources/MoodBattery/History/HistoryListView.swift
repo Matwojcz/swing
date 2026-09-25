@@ -5,6 +5,7 @@ import SwiftUI
 /// focused entry.
 struct HistoryListView: View {
     let entries: [MoodEntry]
+    var onSelect: ((MoodEntry) -> Void)?
 
     var body: some View {
         Group {
@@ -20,6 +21,8 @@ struct HistoryListView: View {
                             Spacer(minLength: 40)
                             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                                 HistoryEntryRow(entry: entry)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { onSelect?(entry) }
                                 if index < entries.count - 1 {
                                     Spacer(minLength: 8)
                                 }

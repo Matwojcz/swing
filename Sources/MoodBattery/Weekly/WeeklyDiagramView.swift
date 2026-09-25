@@ -135,6 +135,7 @@ struct WeeklyDiagramView: View {
             id: Int64(i),
             energy: Double.random(in: 10...95),
             flavour: Double.random(in: 0...1),
+            title: nil,
             note: nil,
             timestamp: calendar.date(byAdding: .hour, value: -i * 6, to: now) ?? now
         )

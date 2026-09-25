@@ -7,6 +7,7 @@ struct MoodEntry: Identifiable, Codable, Equatable {
     var energy: Double
     /// 0...1, blends happy-hype (0) toward irritable-hype (1) above baseline.
     var flavour: Double
+    var title: String?
     var note: String?
     var timestamp: Date
 }

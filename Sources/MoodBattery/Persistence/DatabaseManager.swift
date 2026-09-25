@@ -40,6 +40,12 @@ final class DatabaseManager {
             }
         }
 
+        migrator.registerMigration("addTitle") { db in
+            try db.alter(table: "moodEntry") { t in
+                t.add(column: "title", .text)
+            }
+        }
+
         return migrator
     }
 }

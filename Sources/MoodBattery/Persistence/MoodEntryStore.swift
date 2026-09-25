@@ -22,4 +22,16 @@ struct MoodEntryStore {
             try MoodEntry.order(Column("timestamp").desc).fetchAll(db)
         }
     }
+
+    func deleteAll() throws {
+        try dbQueue.write { db in
+            _ = try MoodEntry.deleteAll(db)
+        }
+    }
+
+    func delete(_ entry: MoodEntry) throws {
+        try dbQueue.write { db in
+            _ = try entry.delete(db)
+        }
+    }
 }

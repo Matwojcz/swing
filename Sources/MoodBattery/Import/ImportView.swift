@@ -4,12 +4,14 @@ struct EditableImportEntry: Identifiable {
     let id = UUID()
     var energy: Double
     var flavour: Double
+    var title: String
     var note: String
     var timestamp: Date
 
     init(parsed: MarkdownImporter.ParsedEntry) {
         self.energy = parsed.energy
         self.flavour = parsed.flavour
+        self.title = parsed.title
         self.note = parsed.note
         self.timestamp = parsed.timestamp
     }
@@ -77,7 +79,7 @@ struct ImportPreviewSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(Self.dateFormatter.string(from: entry.timestamp))
                         .font(.system(size: 12, weight: .semibold))
-                    Text(String(entry.note.prefix(60)))
+                    Text(entry.title.isEmpty ? String(entry.note.prefix(60)) : entry.title)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -99,6 +101,10 @@ struct ImportPreviewSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(Self.dateFormatter.string(from: entries[index].timestamp))
                     .font(.headline)
+
+                TextField("Title", text: $entries[index].title)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 13, weight: .semibold))
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {

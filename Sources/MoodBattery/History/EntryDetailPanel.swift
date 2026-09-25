@@ -74,6 +74,13 @@ struct EntryDetailPanel: View {
                 .scaleEffect(0.55, anchor: .top)
                 .frame(width: GaugeView.width * 0.55, height: GaugeView.height * 0.55)
 
+            if let title = entry.title, !title.isEmpty {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             if let note = entry.note, !note.isEmpty {
                 Text(note)
                     .font(.system(size: 13))
@@ -88,7 +95,7 @@ struct EntryDetailPanel: View {
 
 #Preview {
     EntryDetailPanel(
-        entry: MoodEntry(id: 1, energy: 72, flavour: 0.3, note: "Had a great morning, went for a run and felt really energized. The afternoon was calmer but still good overall.", timestamp: Date()),
+        entry: MoodEntry(id: 1, energy: 72, flavour: 0.3, title: "Great morning", note: "Had a great morning, went for a run and felt really energized. The afternoon was calmer but still good overall.", timestamp: Date()),
         onClose: {}
     )
     .frame(height: 500)

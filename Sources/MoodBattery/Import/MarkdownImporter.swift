@@ -4,6 +4,7 @@ struct MarkdownImporter {
     struct ParsedEntry {
         var energy: Double
         var flavour: Double
+        var title: String
         var note: String
         var timestamp: Date
     }
@@ -64,7 +65,8 @@ struct MarkdownImporter {
             entries.append(ParsedEntry(
                 energy: energy,
                 flavour: flavour,
-                note: fullText,
+                title: currentTitle,
+                note: body,
                 timestamp: date
             ))
             currentDate = nil

@@ -16,8 +16,8 @@ struct ContentView: View {
             HStack(alignment: .top, spacing: 32) {
                 VStack(alignment: .leading, spacing: 24) {
                     MoodEntryEditor(onSave: reload)
-                    WeeklyDiagramView(entries: entries)
-                        .padding(.leading, 24)
+                    MoodDiagramView(entries: entries)
+                        .padding(.horizontal, 24)
                 }
                 HistoryListView(entries: entries, onSelect: { entry in
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -51,6 +51,14 @@ struct ContentView: View {
             ToolbarItem {
                 Button(action: { showImporter = true }) {
                     Label("Import diary", systemImage: "square.and.arrow.down")
+                }
+            }
+            ToolbarItem {
+                Menu {
+                    Button("Seed 6 months of dummy data") { seedDummyData() }
+                    Button("Clear all entries", role: .destructive) { clearAllData() }
+                } label: {
+                    Label("Data", systemImage: "ellipsis.circle")
                 }
             }
         }
@@ -104,12 +112,44 @@ struct ContentView: View {
         }
     }
 
+    private func seedDummyData() {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        var rng = SystemRandomNumberGenerator()
+
+        var energy = 50.0
+        for dayOffset in (0..<180).reversed() {
+            let date = cal.date(byAdding: .day, value: -dayOffset, to: today)!
+            let drift = Double.random(in: -12...12, using: &rng)
+            energy = max(5, min(95, energy + drift))
+            let flavour = Double.random(in: 0...1, using: &rng)
+
+            let titles = ["solid day", "rough morning", "high energy", "calm afternoon",
+                          "restless night", "good focus", "tired", "creative burst",
+                          "low and slow", "baseline", "wired", "quiet day"]
+            let title = titles.randomElement()!
+
+            let entry = MoodEntry(
+                id: nil, energy: energy, flavour: flavour,
+                title: title, note: nil, timestamp: date
+            )
+            try? store.save(entry)
+        }
+        reload()
+    }
+
+    private func clearAllData() {
+        try? store.deleteAll()
+        reload()
+    }
+
     private func confirmImport() {
         for entry in pendingImportEntries {
             let mood = MoodEntry(
                 id: nil,
                 energy: entry.energy,
                 flavour: entry.flavour,
+                title: entry.title.isEmpty ? nil : entry.title,
                 note: entry.note.isEmpty ? nil : entry.note,
                 timestamp: entry.timestamp
             )

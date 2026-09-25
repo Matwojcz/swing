@@ -17,9 +17,12 @@ struct HistoryEntryRow: View {
         return formatter
     }()
 
-    private var title: String {
+    private var displayTitle: String {
+        if let title = entry.title, !title.isEmpty {
+            return title
+        }
         if let note = entry.note, !note.isEmpty {
-            return note
+            return String(note.prefix(50))
         }
         return MoodState.label(energy: entry.energy, flavour: entry.flavour)
     }
@@ -30,7 +33,7 @@ struct HistoryEntryRow: View {
                 .fill(MoodColor.color(energy: entry.energy, flavour: entry.flavour))
                 .frame(width: 6)
 
-            Text(title)
+            Text(displayTitle)
                 .font(.system(size: 13, weight: .semibold))
                 .lineLimit(1)
                 .foregroundStyle(.primary)
@@ -56,8 +59,8 @@ struct HistoryEntryRow: View {
 
 #Preview {
     VStack(spacing: 8) {
-        HistoryEntryRow(entry: MoodEntry(id: 1, energy: 72, flavour: 0.2, note: "Good day at work", timestamp: Date()))
-        HistoryEntryRow(entry: MoodEntry(id: 2, energy: 20, flavour: 0.5, note: nil, timestamp: Date()))
+        HistoryEntryRow(entry: MoodEntry(id: 1, energy: 72, flavour: 0.2, title: "Good day", note: "Good day at work", timestamp: Date()))
+        HistoryEntryRow(entry: MoodEntry(id: 2, energy: 20, flavour: 0.5, title: nil, note: nil, timestamp: Date()))
     }
     .padding()
     .frame(width: 260)

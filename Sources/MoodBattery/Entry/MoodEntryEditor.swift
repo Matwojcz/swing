@@ -10,6 +10,7 @@ extension VerticalAlignment {
 struct MoodEntryEditor: View {
     @State private var energy: Double = 50
     @State private var flavour: Double = 0
+    @State private var title: String = ""
     @State private var note: String = ""
     @State private var saveError: String?
 
@@ -44,6 +45,20 @@ struct MoodEntryEditor: View {
                     headerHeight + headerGaugeSpacing + GaugeView.baselineTopY
                 }
             }
+
+            TextField("Title (optional)", text: $title)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.tankSurface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.tankBorder.opacity(0.3), lineWidth: 1)
+                )
 
             GrowingTextEditor(text: $note, placeholder: "Note (optional)")
 
@@ -109,11 +124,13 @@ struct MoodEntryEditor: View {
             id: nil,
             energy: energy,
             flavour: flavour,
+            title: title.isEmpty ? nil : title,
             note: note.isEmpty ? nil : note,
             timestamp: Date()
         )
         do {
             try store.save(entry)
+            title = ""
             note = ""
             saveError = nil
             onSave?()

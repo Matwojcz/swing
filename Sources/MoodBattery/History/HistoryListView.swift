@@ -7,6 +7,12 @@ struct HistoryListView: View {
     var onDelete: ((MoodEntry) -> Void)?
     var scrollToEntry: MoodEntry?
 
+    @State private var hoverLocation: CGPoint?
+    @State private var isHovering = false
+
+    private let maxScale: CGFloat = 1.05
+    private let magnifyRadius: CGFloat = 120
+
     var body: some View {
         Group {
             if entries.isEmpty {
@@ -29,6 +35,8 @@ struct HistoryListView: View {
                                                     lineWidth: selectedEntry?.id == entry.id ? 2 : 0
                                                 )
                                         )
+                                        .scaleEffect(rowScale(for: index), anchor: .center)
+                                        .animation(.easeOut(duration: 0.15), value: hoverLocation)
                                         .id(entry.id)
                                         .contentShape(Rectangle())
                                         .onTapGesture { onSelect?(entry) }
@@ -39,6 +47,12 @@ struct HistoryListView: View {
                                                 Label("Delete", systemImage: "trash")
                                             }
                                         }
+                                        .background(GeometryReader { geo in
+                                            Color.clear.preference(
+                                                key: RowFrameKey.self,
+                                                value: [index: geo.frame(in: .named("historyList"))]
+                                            )
+                                        })
                                     if index < entries.count - 1 {
                                         Spacer(minLength: 8)
                                     }
@@ -46,6 +60,18 @@ struct HistoryListView: View {
                                 Spacer(minLength: 40)
                             }
                             .frame(minHeight: proxy.size.height)
+                            .onPreferenceChange(RowFrameKey.self) { rowFrames = $0 }
+                        }
+                        .coordinateSpace(name: "historyList")
+                        .onContinuousHover { phase in
+                            switch phase {
+                            case .active(let location):
+                                hoverLocation = location
+                                isHovering = true
+                            case .ended:
+                                hoverLocation = nil
+                                isHovering = false
+                            }
                         }
                         .onChange(of: scrollToEntry?.id) { _, newId in
                             if let newId {
@@ -61,6 +87,26 @@ struct HistoryListView: View {
         }
     }
 
+    // MARK: - Magnification
+
+    @State private var rowFrames: [Int: CGRect] = [:]
+
+    private func rowScale(for index: Int) -> CGFloat {
+        guard isHovering, let cursor = hoverLocation,
+              let frame = rowFrames[index] else { return 1.0 }
+
+        let rowCenterY = frame.midY
+        let distance = abs(cursor.y - rowCenterY)
+
+        guard distance < magnifyRadius else { return 1.0 }
+
+        let normalized = 1.0 - (distance / magnifyRadius)
+        let curve = cos((1.0 - normalized) * .pi / 2)
+        return 1.0 + (maxScale - 1.0) * curve
+    }
+
+    // MARK: - Fade mask
+
     private var fadeMask: some View {
         LinearGradient(
             stops: [
@@ -71,6 +117,13 @@ struct HistoryListView: View {
             startPoint: .top,
             endPoint: .bottom
         )
+    }
+}
+
+private struct RowFrameKey: PreferenceKey {
+    static var defaultValue: [Int: CGRect] = [:]
+    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
 }
 

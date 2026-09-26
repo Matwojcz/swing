@@ -13,7 +13,7 @@ struct ContentView: View {
     private let importer = MarkdownImporter()
 
     var body: some View {
-        HStack(alignment: .top, spacing: 32) {
+        HStack(alignment: .top, spacing: 16) {
             ZStack {
                 VStack(alignment: .leading, spacing: 24) {
                     MoodEntryEditor(onSave: reload)
@@ -26,7 +26,7 @@ struct ContentView: View {
                             }
                         }
                     })
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 16)
                 }
 
                 if let entry = selectedEntry {
@@ -56,6 +56,7 @@ struct ContentView: View {
                     .transition(.opacity)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             HistoryListView(
                 entries: entries,
@@ -74,9 +75,11 @@ struct ContentView: View {
                 },
                 scrollToEntry: scrollToEntry
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxHeight: .infinity)
+            .frame(width: 280)
         }
-        .padding(24)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 20)
         .onAppear(perform: reload)
         .toolbar {
             ToolbarItem {

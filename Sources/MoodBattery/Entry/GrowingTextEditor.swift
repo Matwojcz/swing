@@ -33,6 +33,7 @@ struct GrowingTextEditor: View {
             TextEditor(text: $text)
                 .font(.system(size: 13))
                 .scrollContentBackground(.hidden)
+                .scrollDisabled(textHeight <= maxHeight)
                 .padding(.horizontal, horizontalPadding)
                 .padding(.vertical, verticalPadding)
                 .frame(height: max(minHeight, min(textHeight, maxHeight)))

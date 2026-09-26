@@ -146,6 +146,6 @@ struct ImportPreviewSheet: View {
     private func flavourLabel(_ v: Double) -> String {
         if v < 0.35 { return "happy" }
         if v > 0.65 { return "irritable" }
-        return "mixed"
+        return "normal"
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct EntryDetailPanel: View {
     let entry: MoodEntry
     var onClose: () -> Void
+    var onDelete: (() -> Void)?
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -43,6 +44,14 @@ struct EntryDetailPanel: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.red.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+            }
             Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 18))

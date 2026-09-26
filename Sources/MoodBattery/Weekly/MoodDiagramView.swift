@@ -18,6 +18,7 @@ enum DiagramScale: String, CaseIterable {
 
 struct MoodDiagramView: View {
     let entries: [MoodEntry]
+    var onSelectDate: ((Date) -> Void)?
 
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
@@ -88,6 +89,18 @@ struct MoodDiagramView: View {
                         drawBaseline(in: context, size: size)
                         drawSeries(points, in: context, size: size)
                     }
+
+                    GeometryReader { geo in
+                        ForEach(points, id: \.dayIndex) { dp in
+                            let px = x(forDayIndex: dp.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
+                            let py = y(for: dp.energy, height: geo.size.height)
+                            Color.clear
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                                .position(x: px, y: py)
+                                .onTapGesture { onSelectDate?(dp.date) }
+                        }
+                    }
                 }
             }
             .frame(height: height)
@@ -102,6 +115,7 @@ struct MoodDiagramView: View {
         var dayIndex: Int
         var energy: Double
         var flavour: Double
+        var date: Date
     }
 
     private func dataPoints(for days: [Date]) -> [DataPoint] {
@@ -121,7 +135,8 @@ struct MoodDiagramView: View {
             return DataPoint(
                 dayIndex: index,
                 energy: dayEntries.reduce(0) { $0 + $1.energy } / count,
-                flavour: dayEntries.reduce(0) { $0 + $1.flavour } / count
+                flavour: dayEntries.reduce(0) { $0 + $1.flavour } / count,
+                date: day
             )
         }
     }
@@ -152,7 +167,8 @@ struct MoodDiagramView: View {
                 points.append(DataPoint(
                     dayIndex: midIdx,
                     energy: energySum / count,
-                    flavour: flavourSum / count
+                    flavour: flavourSum / count,
+                    date: days[midIdx]
                 ))
             }
         }

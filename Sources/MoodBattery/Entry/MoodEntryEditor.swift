@@ -46,7 +46,7 @@ struct MoodEntryEditor: View {
                 }
             }
 
-            TextField("Title (optional)", text: $title)
+            TextField("Title", text: $title)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.horizontal, 12)
@@ -60,7 +60,7 @@ struct MoodEntryEditor: View {
                         .stroke(Color.tankBorder.opacity(0.3), lineWidth: 1)
                 )
 
-            GrowingTextEditor(text: $note, placeholder: "Note (optional)")
+            GrowingTextEditor(text: $note, placeholder: "Note")
 
             Button("Log entry", action: save)
                 .buttonStyle(.borderedProminent)
@@ -87,7 +87,7 @@ struct MoodEntryEditor: View {
     private var flavourLabel: String {
         if flavour < 0.35 { return "happy" }
         if flavour > 0.65 { return "irritable" }
-        return "mixed"
+        return "normal"
     }
 
     private var flavourTrack: some View {

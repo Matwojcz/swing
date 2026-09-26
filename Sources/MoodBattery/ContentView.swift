@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var entries: [MoodEntry] = []
     @State private var selectedEntry: MoodEntry?
+    @State private var scrollToEntry: MoodEntry?
     @State private var showImporter = false
     @State private var pendingImportEntries: [EditableImportEntry] = []
     @State private var showImportPreview = false
@@ -16,8 +17,16 @@ struct ContentView: View {
             ZStack {
                 VStack(alignment: .leading, spacing: 24) {
                     MoodEntryEditor(onSave: reload)
-                    MoodDiagramView(entries: entries)
-                        .padding(.horizontal, 24)
+                    MoodDiagramView(entries: entries, onSelectDate: { date in
+                        let cal = Calendar.current
+                        if let entry = entries.first(where: { cal.isDate($0.timestamp, inSameDayAs: date) }) {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                selectedEntry = entry
+                                scrollToEntry = entry
+                            }
+                        }
+                    })
+                    .padding(.horizontal, 24)
                 }
 
                 if let entry = selectedEntry {
@@ -33,16 +42,34 @@ struct ContentView: View {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedEntry = nil
                         }
+                    }, onDelete: {
+                        try? store.delete(entry)
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedEntry = nil
+                        }
+                        reload()
                     })
                     .transition(.opacity)
                 }
             }
 
-            HistoryListView(entries: entries, onSelect: { entry in
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    selectedEntry = entry
-                }
-            })
+            HistoryListView(
+                entries: entries,
+                selectedEntry: selectedEntry,
+                onSelect: { entry in
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        selectedEntry = entry
+                    }
+                },
+                onDelete: { entry in
+                    try? store.delete(entry)
+                    if selectedEntry?.id == entry.id {
+                        selectedEntry = nil
+                    }
+                    reload()
+                },
+                scrollToEntry: scrollToEntry
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(24)

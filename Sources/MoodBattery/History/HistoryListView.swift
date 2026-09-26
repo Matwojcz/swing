@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// A minimal scrollable list of past entries: top and bottom edges fade out
-/// so whatever sits in the vertical middle of the visible area reads as the
-/// focused entry.
 struct HistoryListView: View {
     let entries: [MoodEntry]
+    var selectedEntry: MoodEntry?
     var onSelect: ((MoodEntry) -> Void)?
+    var onDelete: ((MoodEntry) -> Void)?
+    var scrollToEntry: MoodEntry?
 
     var body: some View {
         Group {
@@ -16,20 +16,44 @@ struct HistoryListView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 GeometryReader { proxy in
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 0) {
-                            Spacer(minLength: 40)
-                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                                HistoryEntryRow(entry: entry)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { onSelect?(entry) }
-                                if index < entries.count - 1 {
-                                    Spacer(minLength: 8)
+                    ScrollViewReader { scrollProxy in
+                        ScrollView(showsIndicators: false) {
+                            VStack(spacing: 0) {
+                                Spacer(minLength: 40)
+                                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                                    HistoryEntryRow(entry: entry)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .stroke(
+                                                    MoodColor.color(energy: entry.energy, flavour: entry.flavour),
+                                                    lineWidth: selectedEntry?.id == entry.id ? 2 : 0
+                                                )
+                                        )
+                                        .id(entry.id)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { onSelect?(entry) }
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                onDelete?(entry)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                    if index < entries.count - 1 {
+                                        Spacer(minLength: 8)
+                                    }
+                                }
+                                Spacer(minLength: 40)
+                            }
+                            .frame(minHeight: proxy.size.height)
+                        }
+                        .onChange(of: scrollToEntry?.id) { _, newId in
+                            if let newId {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    scrollProxy.scrollTo(newId, anchor: .center)
                                 }
                             }
-                            Spacer(minLength: 40)
                         }
-                        .frame(minHeight: proxy.size.height)
                     }
                 }
                 .mask(fadeMask)

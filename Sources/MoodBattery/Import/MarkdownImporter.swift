@@ -56,15 +56,28 @@ struct MarkdownImporter {
 
         func flush() {
             guard let date = currentDate else { return }
-            let body = currentBody
+            var noteLines: [String] = []
+            var explicitEnergy: Double?
+            var explicitFlavour: Double?
+
+            for line in currentBody {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if let val = parseField(trimmed, name: "energy") {
+                    explicitEnergy = max(0, min(100, val))
+                } else if let val = parseField(trimmed, name: "flavour") ?? parseField(trimmed, name: "flavor") {
+                    explicitFlavour = max(0, min(1, val))
+                } else {
+                    noteLines.append(line)
+                }
+            }
+
+            let body = noteLines
                 .joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let fullText = currentTitle.isEmpty ? body : (body.isEmpty ? currentTitle : "\(currentTitle)\n\n\(body)")
-            let energy = estimateEnergy(from: fullText)
-            let flavour = estimateFlavour(from: fullText)
             entries.append(ParsedEntry(
-                energy: energy,
-                flavour: flavour,
+                energy: explicitEnergy ?? estimateEnergy(from: fullText),
+                flavour: explicitFlavour ?? estimateFlavour(from: fullText),
                 title: currentTitle,
                 note: body,
                 timestamp: date
@@ -183,6 +196,15 @@ struct MarkdownImporter {
             return ""
         }
         return String(heading[dashRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+    }
+
+    // MARK: - Field parsing
+
+    private func parseField(_ line: String, name: String) -> Double? {
+        let lower = line.lowercased()
+        guard lower.hasPrefix("\(name):") else { return nil }
+        let valueStr = line.dropFirst(name.count + 1).trimmingCharacters(in: .whitespaces)
+        return Double(valueStr)
     }
 
     // MARK: - Energy estimation

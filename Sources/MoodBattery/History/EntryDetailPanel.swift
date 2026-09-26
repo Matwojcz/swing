@@ -222,8 +222,8 @@ struct EntryDetailPanel: View {
             Text(note)
                 .font(.system(size: 13))
                 .foregroundStyle(.primary)
-                .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
                 .onTapGesture(count: 2) {
                     draftNote = note
                     editingField = .note

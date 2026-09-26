@@ -219,15 +219,10 @@ struct MoodDiagramView: View {
             switch scale {
             case .week:
                 ForEach(days, id: \.self) { day in
-                    VStack(spacing: 1) {
-                        Text(Self.weekdayFormatter.string(from: day))
-                            .font(.system(size: 10))
-                            .foregroundStyle(calendar.isDateInToday(day) ? .primary : .secondary)
-                        Text(Self.dayNumberFormatter.string(from: day))
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(calendar.isDateInToday(day) ? .primary : .tertiary)
-                    }
-                    .frame(maxWidth: .infinity)
+                    Text(Self.dayMonthFormatter.string(from: day))
+                        .font(.system(size: 10, weight: calendar.isDateInToday(day) ? .medium : .regular))
+                        .foregroundStyle(calendar.isDateInToday(day) ? .primary : .secondary)
+                        .frame(maxWidth: .infinity)
                 }
             case .month:
                 ForEach([0, 7, 14, 21, 29], id: \.self) { idx in
@@ -251,18 +246,6 @@ struct MoodDiagramView: View {
             }
         }
     }
-
-    private static let weekdayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EEE"
-        return f
-    }()
-
-    private static let dayNumberFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "d"
-        return f
-    }()
 
     private static let dayMonthFormatter: DateFormatter = {
         let f = DateFormatter()

@@ -27,8 +27,7 @@ struct EntryDetailPanel: View {
             content
             Spacer()
         }
-        .frame(width: 320)
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 20, x: 4, y: 0)
@@ -57,22 +56,19 @@ struct EntryDetailPanel: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                Capsule()
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(MoodColor.color(energy: entry.energy, flavour: entry.flavour))
-                    .frame(width: 6, height: 36)
+                    .frame(width: 6, height: 44)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(moodLabel)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(MoodColor.color(energy: entry.energy, flavour: entry.flavour))
                     Text("Energy \(Int(entry.energy))")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
             }
-
-            GaugeView(energy: entry.energy, flavour: entry.flavour)
-                .scaleEffect(0.55, anchor: .top)
-                .frame(width: GaugeView.width * 0.55, height: GaugeView.height * 0.55)
 
             if let title = entry.title, !title.isEmpty {
                 Text(title)

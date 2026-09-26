@@ -12,40 +12,40 @@ struct ContentView: View {
     private let importer = MarkdownImporter()
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            HStack(alignment: .top, spacing: 32) {
+        HStack(alignment: .top, spacing: 32) {
+            ZStack {
                 VStack(alignment: .leading, spacing: 24) {
                     MoodEntryEditor(onSave: reload)
                     MoodDiagramView(entries: entries)
                         .padding(.horizontal, 24)
                 }
-                HistoryListView(entries: entries, onSelect: { entry in
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        selectedEntry = entry
-                    }
-                })
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .padding(24)
 
-            if let entry = selectedEntry {
-                Color.black.opacity(0.15)
-                    .ignoresSafeArea()
-                    .onTapGesture {
+                if let entry = selectedEntry {
+                    Color.black.opacity(0.15)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedEntry = nil
+                            }
+                        }
+
+                    EntryDetailPanel(entry: entry, onClose: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedEntry = nil
                         }
-                    }
-
-                EntryDetailPanel(entry: entry, onClose: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedEntry = nil
-                    }
-                })
-                .padding(16)
-                .transition(.move(edge: .leading).combined(with: .opacity))
+                    })
+                    .transition(.opacity)
+                }
             }
+
+            HistoryListView(entries: entries, onSelect: { entry in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    selectedEntry = entry
+                }
+            })
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .padding(24)
         .onAppear(perform: reload)
         .toolbar {
             ToolbarItem {

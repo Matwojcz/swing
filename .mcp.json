@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mood-battery": {
+      "command": "/opt/homebrew/anaconda3/bin/python3",
+      "args": ["/Users/matwojcz/Dev/mood-battery/mcp-server/mood_battery_server.py"]
+    }
+  }
+}

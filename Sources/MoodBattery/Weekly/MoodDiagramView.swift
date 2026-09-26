@@ -11,6 +11,8 @@ enum DiagramScale: String, CaseIterable {
         }
     }
 
+    var pageCount: Int { 52 }
+
     var label: String { rawValue.capitalized }
 }
 
@@ -18,8 +20,7 @@ struct MoodDiagramView: View {
     let entries: [MoodEntry]
 
     @State private var scale: DiagramScale = .week
-    @State private var pageOffset: Int = 0
-    @GestureState private var dragTranslation: CGFloat = 0
+    @State private var currentPage: Int?
     @State private var magnifyAnchor: CGFloat = 1.0
 
     private let height: CGFloat = 150
@@ -28,17 +29,74 @@ struct MoodDiagramView: View {
 
     private var calendar: Calendar { Calendar.current }
 
-    private var pageEndDate: Date {
-        let today = calendar.startOfDay(for: Date())
-        return calendar.date(byAdding: .day, value: pageOffset * scale.dayCount, to: today)!
-    }
+    private var pageCount: Int { scale.pageCount }
 
-    private var days: [Date] {
-        let end = pageEndDate
+    private func daysForPage(_ page: Int) -> [Date] {
+        let offset = page - (pageCount - 1)
+        let today = calendar.startOfDay(for: Date())
+        let end = calendar.date(byAdding: .day, value: offset * scale.dayCount, to: today)!
         return (0..<scale.dayCount).map {
             calendar.date(byAdding: .day, value: $0 - (scale.dayCount - 1), to: end)!
         }
     }
+
+    private var visiblePage: Int {
+        currentPage ?? (pageCount - 1)
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            monthHeader(for: visiblePage)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 0) {
+                    ForEach(0..<pageCount, id: \.self) { page in
+                        diagramPage(page: page)
+                            .containerRelativeFrame(.horizontal)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $currentPage, anchor: .center)
+            .defaultScrollAnchor(.trailing)
+            .frame(height: height + 30)
+
+            scaleIndicator
+                .padding(.top, 8)
+        }
+        .gesture(pinchGesture)
+        .onChange(of: scale) { _, _ in
+            currentPage = pageCount - 1
+        }
+    }
+
+    // MARK: - Page content
+
+    private func diagramPage(page: Int) -> some View {
+        let days = daysForPage(page)
+        let points = dataPoints(for: days)
+
+        return VStack(spacing: 4) {
+            ZStack {
+                if points.isEmpty {
+                    Text("No entries for this period")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Canvas { context, size in
+                        drawBaseline(in: context, size: size)
+                        drawSeries(points, in: context, size: size)
+                    }
+                }
+            }
+            .frame(height: height)
+
+            dayLabels(for: days)
+        }
+    }
+
+    // MARK: - Data
 
     private struct DataPoint {
         var dayIndex: Int
@@ -46,33 +104,32 @@ struct MoodDiagramView: View {
         var flavour: Double
     }
 
-    private var dataPoints: [DataPoint] {
+    private func dataPoints(for days: [Date]) -> [DataPoint] {
         switch scale {
-        case .week:
-            return dailyAverages
-        case .month:
-            return dailyAverages
+        case .week, .month:
+            return dailyAverages(for: days)
         case .year:
-            return weeklyAveragesForYear
+            return weeklyAverages(for: days)
         }
     }
 
-    private var dailyAverages: [DataPoint] {
+    private func dailyAverages(for days: [Date]) -> [DataPoint] {
         days.enumerated().compactMap { index, day in
             let dayEntries = entries.filter { calendar.isDate($0.timestamp, inSameDayAs: day) }
             guard !dayEntries.isEmpty else { return nil }
             let count = Double(dayEntries.count)
-            let avgEnergy = dayEntries.reduce(0) { $0 + $1.energy } / count
-            let avgFlavour = dayEntries.reduce(0) { $0 + $1.flavour } / count
-            return DataPoint(dayIndex: index, energy: avgEnergy, flavour: avgFlavour)
+            return DataPoint(
+                dayIndex: index,
+                energy: dayEntries.reduce(0) { $0 + $1.energy } / count,
+                flavour: dayEntries.reduce(0) { $0 + $1.flavour } / count
+            )
         }
     }
 
-    private var weeklyAveragesForYear: [DataPoint] {
-        let daysList = days
+    private func weeklyAverages(for days: [Date]) -> [DataPoint] {
         var points: [DataPoint] = []
         let chunkSize = 7
-        let chunkCount = daysList.count / chunkSize
+        let chunkCount = days.count / chunkSize
 
         for chunk in 0..<chunkCount {
             let startIdx = chunk * chunkSize
@@ -82,7 +139,7 @@ struct MoodDiagramView: View {
             var count = 0.0
 
             for i in startIdx..<(startIdx + chunkSize) {
-                let day = daysList[i]
+                let day = days[i]
                 let dayEntries = entries.filter { calendar.isDate($0.timestamp, inSameDayAs: day) }
                 for e in dayEntries {
                     energySum += e.energy
@@ -102,46 +159,22 @@ struct MoodDiagramView: View {
         return points
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            monthHeader
-
-            ZStack {
-                if dataPoints.isEmpty {
-                    Text("No entries for this period")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Canvas { context, size in
-                        drawBaseline(in: context, size: size)
-                        drawSeries(in: context, size: size)
-                    }
-                }
-            }
-            .frame(height: height)
-            .contentShape(Rectangle())
-            .gesture(swipeGesture)
-            .gesture(pinchGesture)
-
-            dayLabels
-
-            scaleIndicator
-        }
-    }
-
     // MARK: - Month header
 
-    private var monthHeader: some View {
-        HStack {
-            Text(monthLabel)
+    private func monthHeader(for page: Int) -> some View {
+        let days = daysForPage(page)
+        return HStack {
+            Text(monthLabel(for: days))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
 
             Spacer()
 
-            if pageOffset != 0 {
+            if page < pageCount - 1 {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { pageOffset = 0 }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        currentPage = pageCount - 1
+                    }
                 } label: {
                     Text("Today")
                         .font(.system(size: 11, weight: .medium))
@@ -152,9 +185,8 @@ struct MoodDiagramView: View {
         }
     }
 
-    private var monthLabel: String {
-        let daysList = days
-        guard let first = daysList.first, let last = daysList.last else { return "" }
+    private func monthLabel(for days: [Date]) -> String {
+        guard let first = days.first, let last = days.last else { return "" }
 
         let firstMonth = calendar.component(.month, from: first)
         let lastMonth = calendar.component(.month, from: last)
@@ -165,10 +197,7 @@ struct MoodDiagramView: View {
         monthFormatter.dateFormat = "MMMM"
 
         if scale == .year {
-            if firstYear == lastYear {
-                return "\(firstYear)"
-            }
-            return "\(firstYear) – \(lastYear)"
+            return firstYear == lastYear ? "\(firstYear)" : "\(firstYear) – \(lastYear)"
         }
 
         let firstMonthName = monthFormatter.string(from: first)
@@ -185,15 +214,20 @@ struct MoodDiagramView: View {
 
     // MARK: - Day labels
 
-    private var dayLabels: some View {
+    private func dayLabels(for days: [Date]) -> some View {
         HStack(spacing: 0) {
             switch scale {
             case .week:
                 ForEach(days, id: \.self) { day in
-                    Text(Self.shortDayFormatter.string(from: day))
-                        .font(.caption2)
-                        .foregroundStyle(calendar.isDateInToday(day) ? .primary : .secondary)
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 1) {
+                        Text(Self.weekdayFormatter.string(from: day))
+                            .font(.system(size: 10))
+                            .foregroundStyle(calendar.isDateInToday(day) ? .primary : .secondary)
+                        Text(Self.dayNumberFormatter.string(from: day))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(calendar.isDateInToday(day) ? .primary : .tertiary)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             case .month:
                 ForEach([0, 7, 14, 21, 29], id: \.self) { idx in
@@ -218,9 +252,15 @@ struct MoodDiagramView: View {
         }
     }
 
-    private static let shortDayFormatter: DateFormatter = {
+    private static let weekdayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEE"
+        return f
+    }()
+
+    private static let dayNumberFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d"
         return f
     }()
 
@@ -244,7 +284,6 @@ struct MoodDiagramView: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         scale = s
-                        pageOffset = 0
                     }
                 } label: {
                     Text(s.label)
@@ -262,29 +301,13 @@ struct MoodDiagramView: View {
                 .buttonStyle(.plain)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Gestures
 
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 20)
-            .onEnded { value in
-                let threshold: CGFloat = 50
-                if value.translation.width < -threshold {
-                    withAnimation(.easeInOut(duration: 0.2)) { pageOffset -= 1 }
-                } else if value.translation.width > threshold {
-                    if pageOffset < 0 {
-                        withAnimation(.easeInOut(duration: 0.2)) { pageOffset += 1 }
-                    }
-                }
-            }
-    }
-
     private var pinchGesture: some Gesture {
         MagnifyGesture()
-            .onChanged { value in
-                magnifyAnchor = value.magnification
-            }
             .onEnded { value in
                 let mag = value.magnification
                 withAnimation(.easeInOut(duration: 0.25)) {
@@ -294,7 +317,6 @@ struct MoodDiagramView: View {
                         zoomIn()
                     }
                 }
-                magnifyAnchor = 1.0
             }
     }
 
@@ -304,7 +326,7 @@ struct MoodDiagramView: View {
         case .month: scale = .week
         case .week: break
         }
-        pageOffset = 0
+        currentPage = pageCount - 1
     }
 
     private func zoomOut() {
@@ -313,30 +335,25 @@ struct MoodDiagramView: View {
         case .month: scale = .year
         case .year: break
         }
-        pageOffset = 0
+        currentPage = pageCount - 1
     }
 
     // MARK: - Geometry
 
-    private func x(forDayIndex index: Int, size: CGSize) -> CGFloat {
-        let totalDays = scale.dayCount
-        let dayWidth = size.width / CGFloat(totalDays)
+    private func x(forDayIndex index: Int, totalDays: Int, width: CGFloat) -> CGFloat {
+        let dayWidth = width / CGFloat(totalDays)
         return (CGFloat(index) + 0.5) * dayWidth
     }
 
-    private func y(for energy: Double, size: CGSize) -> CGFloat {
-        let usable = size.height - verticalPadding * 2
+    private func y(for energy: Double, height: CGFloat) -> CGFloat {
+        let usable = height - verticalPadding * 2
         return verticalPadding + CGFloat(1 - energy / 100) * usable
-    }
-
-    private func point(for dp: DataPoint, size: CGSize) -> CGPoint {
-        CGPoint(x: x(forDayIndex: dp.dayIndex, size: size), y: y(for: dp.energy, size: size))
     }
 
     // MARK: - Drawing
 
     private func drawBaseline(in context: GraphicsContext, size: CGSize) {
-        let baselineY = y(for: 50, size: size)
+        let baselineY = y(for: 50, height: size.height)
         var path = Path()
         path.move(to: CGPoint(x: 0, y: baselineY))
         path.addLine(to: CGPoint(x: size.width, y: baselineY))
@@ -344,10 +361,14 @@ struct MoodDiagramView: View {
                        style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
     }
 
-    private func drawSeries(in context: GraphicsContext, size: CGSize) {
-        let plotted = dataPoints.map { dp in
-            (pos: point(for: dp, size: size),
-             color: MoodColor.color(energy: dp.energy, flavour: dp.flavour))
+    private func drawSeries(_ points: [DataPoint], in context: GraphicsContext, size: CGSize) {
+        let totalDays = scale.dayCount
+        let plotted = points.map { dp in
+            let pos = CGPoint(
+                x: x(forDayIndex: dp.dayIndex, totalDays: totalDays, width: size.width),
+                y: y(for: dp.energy, height: size.height)
+            )
+            return (pos: pos, color: MoodColor.color(energy: dp.energy, flavour: dp.flavour))
         }
         guard !plotted.isEmpty else { return }
 

@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// A single past entry, styled as a minimal pill: a mood-colored accent bar
-/// (echoing the tank's color language), a title, and a time/date stack.
 struct HistoryEntryRow: View {
     let entry: MoodEntry
 
@@ -11,9 +9,15 @@ struct HistoryEntryRow: View {
         return formatter
     }()
 
-    private static let dateFormatter: DateFormatter = {
+    private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
+        formatter.dateFormat = "d"
+        return formatter
+    }()
+
+    private static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
         return formatter
     }()
 
@@ -28,10 +32,19 @@ struct HistoryEntryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Capsule()
                 .fill(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
-                .frame(width: 6)
+                .frame(width: 5)
+
+            VStack(spacing: 1) {
+                Text(Self.dayFormatter.string(from: entry.timestamp))
+                    .font(.system(size: 13, weight: .semibold))
+                Text(Self.monthFormatter.string(from: entry.timestamp))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 28)
 
             Text(displayTitle)
                 .font(.system(size: 13, weight: .semibold))
@@ -40,13 +53,9 @@ struct HistoryEntryRow: View {
 
             Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(Self.timeFormatter.string(from: entry.timestamp))
-                    .font(.system(size: 12, weight: .semibold))
-                Text(Self.dateFormatter.string(from: entry.timestamp))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
+            Text(Self.timeFormatter.string(from: entry.timestamp))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)

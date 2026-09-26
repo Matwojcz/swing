@@ -48,6 +48,10 @@ struct ContentView: View {
                             selectedEntry = nil
                         }
                         reload()
+                    }, onUpdate: { updated in
+                        try? store.save(updated)
+                        reload()
+                        selectedEntry = updated
                     })
                     .transition(.opacity)
                 }

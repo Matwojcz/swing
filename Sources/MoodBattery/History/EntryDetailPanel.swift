@@ -40,14 +40,16 @@ struct EntryDetailPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
-            ScrollView {
+            if editingField == .note {
                 content
+            } else {
+                ScrollView {
+                    content
+                }
             }
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .modifier(GlassPanelModifier())
         .shadow(color: .black.opacity(0.25), radius: 20, x: 4, y: 0)
     }
 
@@ -201,23 +203,27 @@ struct EntryDetailPanel: View {
     private var noteField: some View {
         let note = entry.note ?? ""
         if editingField == .note {
-            TextEditor(text: $draftNote)
-                .font(.system(size: 13))
-                .scrollContentBackground(.hidden)
-                .padding(6)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.tankSurface))
-                .frame(minHeight: 80)
-                .overlay(alignment: .topTrailing) {
+            VStack(spacing: 8) {
+                TextEditor(text: $draftNote)
+                    .font(.system(size: 13))
+                    .scrollContentBackground(.hidden)
+                    .padding(6)
+                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.tankSurface))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                HStack {
+                    Spacer()
                     Button {
                         commitNote()
                     } label: {
                         Text("Done")
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .buttonStyle(.borderedProminent)
+                    .modifier(GlassButtonModifier())
                     .controlSize(.small)
-                    .padding(8)
                 }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !note.isEmpty {
             Text(note)
                 .font(.system(size: 13))
@@ -279,6 +285,19 @@ struct EntryDetailPanel: View {
         updated.note = draftNote.isEmpty ? nil : draftNote
         onUpdate?(updated)
         editingField = nil
+    }
+}
+
+private struct GlassPanelModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        } else {
+            content
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
     }
 }
 

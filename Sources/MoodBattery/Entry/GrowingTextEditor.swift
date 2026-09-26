@@ -38,14 +38,7 @@ struct GrowingTextEditor: View {
                 .padding(.vertical, verticalPadding)
                 .frame(height: max(minHeight, min(textHeight, maxHeight)))
         }
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.tankSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.tankBorder.opacity(0.3), lineWidth: 1)
-        )
+        .modifier(GlassFieldModifier())
         .onPreferenceChange(HeightKey.self) { textHeight = $0 }
     }
 

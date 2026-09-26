@@ -3,6 +3,8 @@ import SwiftUI
 struct HistoryEntryRow: View {
     let entry: MoodEntry
 
+    @State private var isHovered = false
+
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
@@ -59,10 +61,25 @@ struct HistoryEntryRow: View {
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.tankSurface)
-        )
+        .modifier(GlassRowModifier(isHovered: isHovered))
+        .onHover { isHovered = $0 }
+    }
+}
+
+private struct GlassRowModifier: ViewModifier {
+    let isHovered: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(isHovered ? .regular.interactive() : .regular, in: .rect(cornerRadius: 12))
+        } else {
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.tankSurface)
+                )
+        }
     }
 }
 

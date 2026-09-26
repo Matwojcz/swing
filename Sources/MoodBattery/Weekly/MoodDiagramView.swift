@@ -290,12 +290,7 @@ struct MoodDiagramView: View {
                         .foregroundStyle(s == scale ? .primary : .secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(
-                            s == scale
-                                ? RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color.tankSurface)
-                                : nil
-                        )
+                        .modifier(GlassScaleTabModifier(isSelected: s == scale))
                 }
                 .buttonStyle(.plain)
             }

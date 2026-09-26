@@ -51,19 +51,12 @@ struct MoodEntryEditor: View {
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.tankSurface)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.tankBorder.opacity(0.3), lineWidth: 1)
-                )
+                .modifier(GlassFieldModifier())
 
             GrowingTextEditor(text: $note, placeholder: "Note")
 
             Button("Log entry", action: save)
-                .buttonStyle(.borderedProminent)
+                .modifier(GlassButtonModifier())
 
             if let saveError {
                 Text(saveError)

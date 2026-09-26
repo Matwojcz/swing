@@ -25,7 +25,7 @@ struct HistoryListView: View {
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                                 .stroke(
-                                                    MoodColor.color(energy: entry.energy, flavour: entry.flavour),
+                                                    MoodColor.color(mood: entry.mood, flavour: entry.flavour),
                                                     lineWidth: selectedEntry?.id == entry.id ? 2 : 0
                                                 )
                                         )
@@ -77,7 +77,7 @@ struct HistoryListView: View {
 
 #Preview {
     HistoryListView(entries: (0..<10).map {
-        MoodEntry(id: Int64($0), energy: Double.random(in: 0...100), flavour: 0.4, note: nil, timestamp: Date())
+        MoodEntry(id: Int64($0), mood: Double.random(in: 0...100), flavour: 0.4, note: nil, timestamp: Date())
     })
     .frame(width: 240, height: 320)
 }

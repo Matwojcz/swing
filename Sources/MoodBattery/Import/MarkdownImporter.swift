@@ -2,7 +2,7 @@ import Foundation
 
 struct MarkdownImporter {
     struct ParsedEntry {
-        var energy: Double
+        var mood: Double
         var flavour: Double
         var title: String
         var note: String
@@ -34,7 +34,7 @@ struct MarkdownImporter {
         for parsed in entries {
             let entry = MoodEntry(
                 id: nil,
-                energy: parsed.energy,
+                mood: parsed.mood,
                 flavour: parsed.flavour,
                 note: parsed.note.isEmpty ? nil : parsed.note,
                 timestamp: parsed.timestamp
@@ -57,13 +57,13 @@ struct MarkdownImporter {
         func flush() {
             guard let date = currentDate else { return }
             var noteLines: [String] = []
-            var explicitEnergy: Double?
+            var explicitMood: Double?
             var explicitFlavour: Double?
 
             for line in currentBody {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if let val = parseField(trimmed, name: "energy") {
-                    explicitEnergy = max(0, min(100, val))
+                if let val = parseField(trimmed, name: "mood") ?? parseField(trimmed, name: "energy") {
+                    explicitMood = max(0, min(100, val))
                 } else if let val = parseField(trimmed, name: "flavour") ?? parseField(trimmed, name: "flavor") {
                     explicitFlavour = max(0, min(1, val))
                 } else {
@@ -76,7 +76,7 @@ struct MarkdownImporter {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let fullText = currentTitle.isEmpty ? body : (body.isEmpty ? currentTitle : "\(currentTitle)\n\n\(body)")
             entries.append(ParsedEntry(
-                energy: explicitEnergy ?? estimateEnergy(from: fullText),
+                mood: explicitMood ?? estimateMood(from: fullText),
                 flavour: explicitFlavour ?? estimateFlavour(from: fullText),
                 title: currentTitle,
                 note: body,
@@ -207,9 +207,9 @@ struct MarkdownImporter {
         return Double(valueStr)
     }
 
-    // MARK: - Energy estimation
+    // MARK: - Mood estimation
 
-    private func estimateEnergy(from text: String) -> Double {
+    private func estimateMood(from text: String) -> Double {
         let lower = text.lowercased()
         var score: Double = 50
 

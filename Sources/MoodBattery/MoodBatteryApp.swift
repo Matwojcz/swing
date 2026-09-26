@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MoodBatteryApp: App {
+struct SwingApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

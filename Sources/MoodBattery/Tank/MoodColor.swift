@@ -23,15 +23,15 @@ enum MoodColor {
     ]
 
     /// - Parameters:
-    ///   - energy: 0...100, baseline at 50.
+    ///   - mood: 0...100, baseline at 50.
     ///   - flavour: 0...1, 0 = happy hype, 1 = irritable hype.
-    static func color(energy: Double, flavour: Double) -> Color {
+    static func color(mood: Double, flavour: Double) -> Color {
         let rgb: (Double, Double, Double)
-        if energy <= 50 {
-            rgb = interp(lowStops, energy)
+        if mood <= 50 {
+            rgb = interp(lowStops, mood)
         } else {
-            let happy = interp(happyHighStops, energy)
-            let irritable = interp(irritableHighStops, energy)
+            let happy = interp(happyHighStops, mood)
+            let irritable = interp(irritableHighStops, mood)
             rgb = (
                 lerp(happy.0, irritable.0, flavour),
                 lerp(happy.1, irritable.1, flavour),

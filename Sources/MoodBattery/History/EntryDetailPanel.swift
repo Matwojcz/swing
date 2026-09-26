@@ -18,7 +18,7 @@ struct EntryDetailPanel: View {
     }()
 
     private var moodLabel: String {
-        MoodState.label(energy: entry.energy, flavour: entry.flavour)
+        MoodState.label(mood: entry.mood, flavour: entry.flavour)
     }
 
     var body: some View {
@@ -66,14 +66,14 @@ struct EntryDetailPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(MoodColor.color(energy: entry.energy, flavour: entry.flavour))
+                    .fill(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
                     .frame(width: 6, height: 44)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(moodLabel)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(MoodColor.color(energy: entry.energy, flavour: entry.flavour))
-                    Text("Energy \(Int(entry.energy))")
+                        .foregroundStyle(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
+                    Text("Mood \(Int(entry.mood))")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
@@ -100,7 +100,7 @@ struct EntryDetailPanel: View {
 
 #Preview {
     EntryDetailPanel(
-        entry: MoodEntry(id: 1, energy: 72, flavour: 0.3, title: "Great morning", note: "Had a great morning, went for a run and felt really energized. The afternoon was calmer but still good overall.", timestamp: Date()),
+        entry: MoodEntry(id: 1, mood: 72, flavour: 0.3, title: "Great morning", note: "Had a great morning, went for a run and felt really energized. The afternoon was calmer but still good overall.", timestamp: Date()),
         onClose: {}
     )
     .frame(height: 500)

@@ -24,13 +24,13 @@ struct HistoryEntryRow: View {
         if let note = entry.note, !note.isEmpty {
             return String(note.prefix(50))
         }
-        return MoodState.label(energy: entry.energy, flavour: entry.flavour)
+        return MoodState.label(mood: entry.mood, flavour: entry.flavour)
     }
 
     var body: some View {
         HStack(spacing: 12) {
             Capsule()
-                .fill(MoodColor.color(energy: entry.energy, flavour: entry.flavour))
+                .fill(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
                 .frame(width: 6)
 
             Text(displayTitle)
@@ -59,8 +59,8 @@ struct HistoryEntryRow: View {
 
 #Preview {
     VStack(spacing: 8) {
-        HistoryEntryRow(entry: MoodEntry(id: 1, energy: 72, flavour: 0.2, title: "Good day", note: "Good day at work", timestamp: Date()))
-        HistoryEntryRow(entry: MoodEntry(id: 2, energy: 20, flavour: 0.5, title: nil, note: nil, timestamp: Date()))
+        HistoryEntryRow(entry: MoodEntry(id: 1, mood: 72, flavour: 0.2, title: "Good day", note: "Good day at work", timestamp: Date()))
+        HistoryEntryRow(entry: MoodEntry(id: 2, mood: 20, flavour: 0.5, title: nil, note: nil, timestamp: Date()))
     }
     .padding()
     .frame(width: 260)

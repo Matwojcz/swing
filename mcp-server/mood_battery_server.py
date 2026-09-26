@@ -1,5 +1,5 @@
 """
-MCP server for Mood Battery — lets Claude read and write mood entries
+MCP server for Swing — lets Claude read and write mood entries
 directly in the app's SQLite database.
 
 Add to your Claude config (claude_desktop_config.json or .claude.json):
@@ -30,13 +30,13 @@ DB_PATH = os.path.expanduser(
 mcp = FastMCP(
     "mood-battery",
     instructions=(
-        "Mood Battery is a bipolar mood tracker. Energy ranges 0–100 "
+        "Swing is a bipolar mood tracker. Mood ranges 0–100 "
         "(0 = deep depressive, 50 = baseline, 100 = peak hype). "
-        "Flavour ranges 0.0–1.0 (0 = happy/euphoric energy, 1 = irritable/agitated energy; "
+        "Flavour ranges 0.0–1.0 (0 = calm, 0.5 = normal, 1 = irritable; "
         "only meaningful above baseline). "
         "Titles are short mood summaries (2–4 words). "
         "Notes are longer diary text. "
-        "When the user describes their mood conversationally, extract energy and flavour "
+        "When the user describes their mood conversationally, extract mood and flavour "
         "from context and save an entry. Ask to confirm before saving if uncertain."
     ),
 )
@@ -51,7 +51,7 @@ def get_db() -> sqlite3.Connection:
 def row_to_dict(row: sqlite3.Row) -> dict:
     return {
         "id": row["id"],
-        "energy": row["energy"],
+        "mood": row["mood"],
         "flavour": row["flavour"],
         "title": row["title"],
         "note": row["note"],
@@ -61,7 +61,7 @@ def row_to_dict(row: sqlite3.Row) -> dict:
 
 def format_entry(entry: dict) -> str:
     parts = [f"[{entry['id']}] {entry['timestamp']}"]
-    parts.append(f"  Energy: {entry['energy']:.0f}, Flavour: {entry['flavour']:.2f}")
+    parts.append(f"  Mood: {entry['mood']:.0f}, Flavour: {entry['flavour']:.2f}")
     if entry["title"]:
         parts.append(f"  Title: {entry['title']}")
     if entry["note"]:
@@ -74,7 +74,7 @@ def format_entry(entry: dict) -> str:
 
 @mcp.tool()
 def save_mood_entry(
-    energy: float,
+    mood: float,
     flavour: float,
     title: str | None = None,
     note: str | None = None,
@@ -83,14 +83,14 @@ def save_mood_entry(
     """Save a new mood entry.
 
     Args:
-        energy: Energy level 0–100 (0=depressive floor, 50=baseline, 100=peak hype)
+        mood: Mood level 0–100 (0=depressive floor, 50=baseline, 100=peak hype)
         flavour: Mood flavour 0.0–1.0 (0=happy/euphoric, 1=irritable/agitated; matters above 50 energy)
-        title: Short mood summary, 2–4 words (e.g. "rough morning", "high energy")
+        title: Short mood summary, 2–4 words (e.g. "rough morning", "elevated")
         note: Longer diary text
         timestamp: ISO 8601 timestamp; defaults to now
     """
-    if not 0 <= energy <= 100:
-        return "Error: energy must be 0–100"
+    if not 0 <= mood <= 100:
+        return "Error: mood must be 0–100"
     if not 0 <= flavour <= 1:
         return "Error: flavour must be 0.0–1.0"
 
@@ -101,19 +101,19 @@ def save_mood_entry(
 
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO moodEntry (energy, flavour, title, note, timestamp) VALUES (?, ?, ?, ?, ?)",
-        (energy, flavour, title, note, ts),
+        "INSERT INTO moodEntry (mood, flavour, title, note, timestamp) VALUES (?, ?, ?, ?, ?)",
+        (mood, flavour, title, note, ts),
     )
     db.commit()
     entry_id = cursor.lastrowid
     db.close()
-    return f"Saved entry #{entry_id} — energy {energy:.0f}, flavour {flavour:.2f}, title: {title or '(none)'}"
+    return f"Saved entry #{entry_id} — mood {mood:.0f}, flavour {flavour:.2f}, title: {title or '(none)'}"
 
 
 @mcp.tool()
 def update_mood_entry(
     entry_id: int,
-    energy: float | None = None,
+    mood: float | None = None,
     flavour: float | None = None,
     title: str | None = None,
     note: str | None = None,
@@ -123,7 +123,7 @@ def update_mood_entry(
 
     Args:
         entry_id: The entry's ID
-        energy: New energy level 0–100
+        mood: New mood level 0–100
         flavour: New flavour 0.0–1.0
         title: New title
         note: New note text
@@ -136,11 +136,11 @@ def update_mood_entry(
         return f"Error: entry #{entry_id} not found"
 
     updates = {}
-    if energy is not None:
-        if not 0 <= energy <= 100:
+    if mood is not None:
+        if not 0 <= mood <= 100:
             db.close()
-            return "Error: energy must be 0–100"
-        updates["energy"] = energy
+            return "Error: mood must be 0–100"
+        updates["mood"] = mood
     if flavour is not None:
         if not 0 <= flavour <= 1:
             db.close()
@@ -205,7 +205,7 @@ def get_entry(entry_id: int) -> str:
     entry = row_to_dict(row)
     parts = [f"Entry #{entry['id']}"]
     parts.append(f"Timestamp: {entry['timestamp']}")
-    parts.append(f"Energy: {entry['energy']:.0f}")
+    parts.append(f"Mood: {entry['mood']:.0f}")
     parts.append(f"Flavour: {entry['flavour']:.2f}")
     parts.append(f"Title: {entry['title'] or '(none)'}")
     parts.append(f"Note: {entry['note'] or '(none)'}")
@@ -276,7 +276,7 @@ def entries_for_date(date: str) -> str:
 
 @mcp.tool()
 def mood_summary(days: int = 7) -> str:
-    """Get a summary of mood over a period — average energy, range, and entry count.
+    """Get a summary of mood over a period — average mood, range, and entry count.
 
     Args:
         days: Number of days to look back (default 7)
@@ -291,14 +291,14 @@ def mood_summary(days: int = 7) -> str:
     if not rows:
         return f"No entries in the last {days} days."
 
-    energies = [r["energy"] for r in rows]
+    moods = [r["mood"] for r in rows]
     flavours = [r["flavour"] for r in rows]
-    avg_energy = sum(energies) / len(energies)
+    avg_mood = sum(moods) / len(moods)
     avg_flavour = sum(flavours) / len(flavours)
 
     return (
         f"Last {days} days: {len(rows)} entries\n"
-        f"Energy — avg: {avg_energy:.0f}, min: {min(energies):.0f}, max: {max(energies):.0f}\n"
+        f"Mood — avg: {avg_mood:.0f}, min: {min(moods):.0f}, max: {max(moods):.0f}\n"
         f"Flavour — avg: {avg_flavour:.2f}\n"
         f"Range: {rows[0]['timestamp']} → {rows[-1]['timestamp']}"
     )

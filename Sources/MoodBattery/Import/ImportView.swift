@@ -2,14 +2,14 @@ import SwiftUI
 
 struct EditableImportEntry: Identifiable {
     let id = UUID()
-    var energy: Double
+    var mood: Double
     var flavour: Double
     var title: String
     var note: String
     var timestamp: Date
 
     init(parsed: MarkdownImporter.ParsedEntry) {
-        self.energy = parsed.energy
+        self.mood = parsed.mood
         self.flavour = parsed.flavour
         self.title = parsed.title
         self.note = parsed.note
@@ -57,7 +57,7 @@ struct ImportPreviewSheet: View {
             VStack(alignment: .leading) {
                 Text("Review imported entries")
                     .font(.headline)
-                Text("\(entries.count) entries found — adjust energy and flavour before importing")
+                Text("\(entries.count) entries found — adjust mood and flavour before importing")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -73,7 +73,7 @@ struct ImportPreviewSheet: View {
         List(entries, selection: $selectedId) { entry in
             HStack(spacing: 10) {
                 Capsule()
-                    .fill(MoodColor.color(energy: entry.energy, flavour: entry.flavour))
+                    .fill(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
                     .frame(width: 5, height: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -87,7 +87,7 @@ struct ImportPreviewSheet: View {
 
                 Spacer()
 
-                Text("\(Int(entry.energy))")
+                Text("\(Int(entry.mood))")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -108,14 +108,14 @@ struct ImportPreviewSheet: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Energy")
+                        Text("Mood")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(Int(entries[index].energy))")
+                        Text("\(Int(entries[index].mood))")
                             .font(.system(size: 13, weight: .semibold))
                     }
-                    Slider(value: $entries[index].energy, in: 0...100, step: 1)
+                    Slider(value: $entries[index].mood, in: 0...100, step: 1)
 
                     HStack {
                         Text("Flavour")
@@ -129,7 +129,7 @@ struct ImportPreviewSheet: View {
                 }
 
                 Capsule()
-                    .fill(MoodColor.color(energy: entries[index].energy, flavour: entries[index].flavour))
+                    .fill(MoodColor.color(mood: entries[index].mood, flavour: entries[index].flavour))
                     .frame(height: 6)
 
                 Text("Note")
@@ -144,7 +144,7 @@ struct ImportPreviewSheet: View {
     }
 
     private func flavourLabel(_ v: Double) -> String {
-        if v < 0.35 { return "happy" }
+        if v < 0.35 { return "calm" }
         if v > 0.65 { return "irritable" }
         return "normal"
     }

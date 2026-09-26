@@ -4,7 +4,7 @@ import GRDB
 struct MoodEntry: Identifiable, Codable, Equatable {
     var id: Int64?
     /// 0...100, baseline (neutral) at 50.
-    var energy: Double
+    var mood: Double
     /// 0...1, blends happy-hype (0) toward irritable-hype (1) above baseline.
     var flavour: Double
     var title: String?

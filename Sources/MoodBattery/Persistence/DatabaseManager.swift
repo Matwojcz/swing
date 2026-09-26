@@ -46,6 +46,23 @@ final class DatabaseManager {
             }
         }
 
+        migrator.registerMigration("renameEnergyToMood") { db in
+            try db.rename(table: "moodEntry", to: "moodEntry_old")
+            try db.create(table: "moodEntry") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("mood", .double).notNull()
+                t.column("flavour", .double).notNull()
+                t.column("note", .text)
+                t.column("timestamp", .datetime).notNull()
+                t.column("title", .text)
+            }
+            try db.execute(sql: """
+                INSERT INTO moodEntry (id, mood, flavour, note, timestamp, title)
+                SELECT id, energy, flavour, note, timestamp, title FROM moodEntry_old
+            """)
+            try db.drop(table: "moodEntry_old")
+        }
+
         return migrator
     }
 }

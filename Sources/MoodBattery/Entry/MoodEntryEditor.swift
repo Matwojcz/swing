@@ -8,7 +8,7 @@ extension VerticalAlignment {
 }
 
 struct MoodEntryEditor: View {
-    @State private var energy: Double = 50
+    @State private var mood: Double = 50
     @State private var flavour: Double = 0
     @State private var title: String = ""
     @State private var note: String = ""
@@ -27,7 +27,7 @@ struct MoodEntryEditor: View {
                 VStack(spacing: headerGaugeSpacing) {
                     header
                         .frame(height: headerHeight)
-                    GaugeView(energy: energy, flavour: flavour, onEnergyChange: { energy = $0 })
+                    GaugeView(mood: mood, flavour: flavour, onMoodChange: { mood = $0 })
                 }
                 .alignmentGuide(.gaugeBaselineTop) { _ in
                     headerHeight + headerGaugeSpacing + GaugeView.baselineTopY
@@ -76,16 +76,16 @@ struct MoodEntryEditor: View {
 
     private var header: some View {
         VStack(spacing: 2) {
-            Text(MoodState.label(energy: energy, flavour: flavour))
+            Text(MoodState.label(mood: mood, flavour: flavour))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("\(Int(energy))")
+            Text("\(Int(mood))")
                 .font(.system(size: 28, weight: .medium))
         }
     }
 
     private var flavourLabel: String {
-        if flavour < 0.35 { return "happy" }
+        if flavour < 0.35 { return "calm" }
         if flavour > 0.65 { return "irritable" }
         return "normal"
     }
@@ -103,7 +103,7 @@ struct MoodEntryEditor: View {
                 .frame(width: trackWidth, height: length)
 
             Circle()
-                .fill(MoodColor.color(energy: max(energy, 51), flavour: flavour))
+                .fill(MoodColor.color(mood: max(mood, 51), flavour: flavour))
                 .overlay(Circle().stroke(Color.tankBorder, lineWidth: 1.5))
                 .frame(width: thumbSize, height: thumbSize)
                 .offset(y: flavour * (length - thumbSize))
@@ -122,7 +122,7 @@ struct MoodEntryEditor: View {
     private func save() {
         let entry = MoodEntry(
             id: nil,
-            energy: energy,
+            mood: mood,
             flavour: flavour,
             title: title.isEmpty ? nil : title,
             note: note.isEmpty ? nil : note,

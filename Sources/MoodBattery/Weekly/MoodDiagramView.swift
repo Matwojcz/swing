@@ -93,7 +93,7 @@ struct MoodDiagramView: View {
                     GeometryReader { geo in
                         ForEach(points, id: \.dayIndex) { dp in
                             let px = x(forDayIndex: dp.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
-                            let py = y(for: dp.energy, height: geo.size.height)
+                            let py = y(for: dp.mood, height: geo.size.height)
                             Color.clear
                                 .frame(width: 28, height: 28)
                                 .contentShape(Rectangle())
@@ -113,7 +113,7 @@ struct MoodDiagramView: View {
 
     private struct DataPoint {
         var dayIndex: Int
-        var energy: Double
+        var mood: Double
         var flavour: Double
         var date: Date
     }
@@ -134,7 +134,7 @@ struct MoodDiagramView: View {
             let count = Double(dayEntries.count)
             return DataPoint(
                 dayIndex: index,
-                energy: dayEntries.reduce(0) { $0 + $1.energy } / count,
+                mood: dayEntries.reduce(0) { $0 + $1.mood } / count,
                 flavour: dayEntries.reduce(0) { $0 + $1.flavour } / count,
                 date: day
             )
@@ -149,7 +149,7 @@ struct MoodDiagramView: View {
         for chunk in 0..<chunkCount {
             let startIdx = chunk * chunkSize
             let midIdx = startIdx + chunkSize / 2
-            var energySum = 0.0
+            var moodSum = 0.0
             var flavourSum = 0.0
             var count = 0.0
 
@@ -157,7 +157,7 @@ struct MoodDiagramView: View {
                 let day = days[i]
                 let dayEntries = entries.filter { calendar.isDate($0.timestamp, inSameDayAs: day) }
                 for e in dayEntries {
-                    energySum += e.energy
+                    moodSum += e.mood
                     flavourSum += e.flavour
                     count += 1
                 }
@@ -166,7 +166,7 @@ struct MoodDiagramView: View {
             if count > 0 {
                 points.append(DataPoint(
                     dayIndex: midIdx,
-                    energy: energySum / count,
+                    mood: moodSum / count,
                     flavour: flavourSum / count,
                     date: days[midIdx]
                 ))
@@ -344,9 +344,9 @@ struct MoodDiagramView: View {
         return (CGFloat(index) + 0.5) * dayWidth
     }
 
-    private func y(for energy: Double, height: CGFloat) -> CGFloat {
+    private func y(for mood: Double, height: CGFloat) -> CGFloat {
         let usable = height - verticalPadding * 2
-        return verticalPadding + CGFloat(1 - energy / 100) * usable
+        return verticalPadding + CGFloat(1 - mood / 100) * usable
     }
 
     // MARK: - Drawing
@@ -365,9 +365,9 @@ struct MoodDiagramView: View {
         let plotted = points.map { dp in
             let pos = CGPoint(
                 x: x(forDayIndex: dp.dayIndex, totalDays: totalDays, width: size.width),
-                y: y(for: dp.energy, height: size.height)
+                y: y(for: dp.mood, height: size.height)
             )
-            return (pos: pos, color: MoodColor.color(energy: dp.energy, flavour: dp.flavour))
+            return (pos: pos, color: MoodColor.color(mood: dp.mood, flavour: dp.flavour))
         }
         guard !plotted.isEmpty else { return }
 
@@ -403,7 +403,7 @@ struct MoodDiagramView: View {
     let sample: [MoodEntry] = (0..<60).map { i in
         MoodEntry(
             id: Int64(i),
-            energy: Double.random(in: 10...95),
+            mood: Double.random(in: 10...95),
             flavour: Double.random(in: 0...1),
             title: nil,
             note: nil,

@@ -144,11 +144,11 @@ struct ContentView: View {
         let today = cal.startOfDay(for: Date())
         var rng = SystemRandomNumberGenerator()
 
-        var energy = 50.0
+        var mood = 50.0
         for dayOffset in (0..<180).reversed() {
             let date = cal.date(byAdding: .day, value: -dayOffset, to: today)!
             let drift = Double.random(in: -12...12, using: &rng)
-            energy = max(5, min(95, energy + drift))
+            mood = max(5, min(95, mood + drift))
             let flavour = Double.random(in: 0...1, using: &rng)
 
             let titles = ["solid day", "rough morning", "high energy", "calm afternoon",
@@ -157,7 +157,7 @@ struct ContentView: View {
             let title = titles.randomElement()!
 
             let entry = MoodEntry(
-                id: nil, energy: energy, flavour: flavour,
+                id: nil, mood: mood, flavour: flavour,
                 title: title, note: nil, timestamp: date
             )
             try? store.save(entry)
@@ -174,7 +174,7 @@ struct ContentView: View {
         for entry in pendingImportEntries {
             let mood = MoodEntry(
                 id: nil,
-                energy: entry.energy,
+                mood: entry.mood,
                 flavour: entry.flavour,
                 title: entry.title.isEmpty ? nil : entry.title,
                 note: entry.note.isEmpty ? nil : entry.note,

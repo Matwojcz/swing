@@ -1,10 +1,5 @@
 import SwiftUI
 
-/// A week of entries plotted as energy-over-time: a dashed baseline at 50
-/// (echoing the gauge's baseline tick) and a line whose segments and points
-/// are colored via MoodColor, so the weekly view visually echoes the daily
-/// widget rather than switching to a generic bar chart. Descriptive only —
-/// this is not trend detection or a clinical read of the data.
 struct WeeklyDiagramView: View {
     let entries: [MoodEntry]
 
@@ -20,17 +15,14 @@ struct WeeklyDiagramView: View {
         return (0..<7).map { calendar.date(byAdding: .day, value: $0 - 6, to: today)! }
     }
 
-    /// One point per day (mean energy/flavour), rather than one point per
-    /// entry — a day with a morning and an evening entry would otherwise
-    /// draw an odd up-and-down spike within its own column.
-    private var dailyAverages: [(dayIndex: Int, energy: Double, flavour: Double)] {
+    private var dailyAverages: [(dayIndex: Int, mood: Double, flavour: Double)] {
         days.enumerated().compactMap { index, day in
             let dayEntries = entries.filter { calendar.isDate($0.timestamp, inSameDayAs: day) }
             guard !dayEntries.isEmpty else { return nil }
             let count = Double(dayEntries.count)
-            let avgEnergy = dayEntries.reduce(0) { $0 + $1.energy } / count
+            let avgMood = dayEntries.reduce(0) { $0 + $1.mood } / count
             let avgFlavour = dayEntries.reduce(0) { $0 + $1.flavour } / count
-            return (dayIndex: index, energy: avgEnergy, flavour: avgFlavour)
+            return (dayIndex: index, mood: avgMood, flavour: avgFlavour)
         }
     }
 
@@ -79,13 +71,13 @@ struct WeeklyDiagramView: View {
         return (CGFloat(index) + 0.5) * dayWidth
     }
 
-    private func y(for energy: Double, size: CGSize) -> CGFloat {
+    private func y(for mood: Double, size: CGSize) -> CGFloat {
         let usable = size.height - verticalPadding * 2
-        return verticalPadding + CGFloat(1 - energy / 100) * usable
+        return verticalPadding + CGFloat(1 - mood / 100) * usable
     }
 
-    private func point(for average: (dayIndex: Int, energy: Double, flavour: Double), size: CGSize) -> CGPoint {
-        CGPoint(x: x(forDayIndex: average.dayIndex, size: size), y: y(for: average.energy, size: size))
+    private func point(for average: (dayIndex: Int, mood: Double, flavour: Double), size: CGSize) -> CGPoint {
+        CGPoint(x: x(forDayIndex: average.dayIndex, size: size), y: y(for: average.mood, size: size))
     }
 
     // MARK: - Drawing
@@ -100,7 +92,7 @@ struct WeeklyDiagramView: View {
 
     private func drawSeries(in context: GraphicsContext, size: CGSize) {
         let plotted = dailyAverages.map { average in
-            (pos: point(for: average, size: size), color: MoodColor.color(energy: average.energy, flavour: average.flavour))
+            (pos: point(for: average, size: size), color: MoodColor.color(mood: average.mood, flavour: average.flavour))
         }
         guard !plotted.isEmpty else { return }
 
@@ -133,7 +125,7 @@ struct WeeklyDiagramView: View {
     let sample: [MoodEntry] = (0..<10).map { i in
         MoodEntry(
             id: Int64(i),
-            energy: Double.random(in: 10...95),
+            mood: Double.random(in: 10...95),
             flavour: Double.random(in: 0...1),
             title: nil,
             note: nil,

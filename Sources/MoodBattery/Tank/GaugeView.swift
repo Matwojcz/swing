@@ -9,9 +9,9 @@ import SwiftUI
 /// `onEnergyChange` is supplied, so it can be reused unchanged in read-only
 /// views (history, weekly summary).
 struct GaugeView: View {
-    var energy: Double
+    var mood: Double
     var flavour: Double
-    var onEnergyChange: ((Double) -> Void)? = nil
+    var onMoodChange: ((Double) -> Void)? = nil
 
     /// Reference geometry (from mood-gauge.html) scaled up 20% — the dial
     /// read too small next to the rest of the entry screen.
@@ -39,15 +39,15 @@ struct GaugeView: View {
     private var needleLength: CGFloat { Self.needleLength }
 
     private var fillColor: Color {
-        MoodColor.color(energy: energy, flavour: flavour)
+        MoodColor.color(mood: mood, flavour: flavour)
     }
 
     var body: some View {
         Group {
-            if let onEnergyChange {
+            if let onMoodChange {
                 gaugeStack
                     .contentShape(Rectangle())
-                    .gesture(dragGesture(onEnergyChange))
+                    .gesture(dragGesture(onMoodChange))
             } else {
                 gaugeStack
             }
@@ -65,11 +65,11 @@ struct GaugeView: View {
             }
             .frame(width: width, height: height)
 
-            if energy >= redlineThreshold {
+            if mood >= redlineThreshold {
                 GaugeSparkView(
                     color: fillColor,
-                    tip: point(for: energy, radius: needleLength),
-                    directionDegrees: angleDegrees(for: energy)
+                    tip: point(for: mood, radius: needleLength),
+                    directionDegrees: angleDegrees(for: mood)
                 )
                 .frame(width: width, height: height)
             }
@@ -97,7 +97,7 @@ struct GaugeView: View {
             var path = Path()
             path.move(to: point(for: v, radius: innerRadius))
             path.addLine(to: point(for: v, radius: outerRadius))
-            context.stroke(path, with: .color(MoodColor.color(energy: v, flavour: flavour)), lineWidth: 3 * Self.scale)
+            context.stroke(path, with: .color(MoodColor.color(mood: v, flavour: flavour)), lineWidth: 3 * Self.scale)
         }
     }
 
@@ -126,8 +126,8 @@ struct GaugeView: View {
     private func drawNeedle(in context: GraphicsContext) {
         var path = Path()
         path.move(to: CGPoint(x: cx, y: cy))
-        path.addLine(to: point(for: energy, radius: needleLength))
-        let strokeColor: Color = energy >= redlineThreshold
+        path.addLine(to: point(for: mood, radius: needleLength))
+        let strokeColor: Color = mood >= redlineThreshold
             ? Color(red: 242 / 255, green: 240 / 255, blue: 233 / 255)
             : Color(red: 232 / 255, green: 230 / 255, blue: 223 / 255)
         context.stroke(path, with: .color(strokeColor), style: StrokeStyle(lineWidth: 3 * Self.scale, lineCap: .round))
@@ -143,7 +143,7 @@ struct GaugeView: View {
 
     // MARK: - Drag
 
-    private func dragGesture(_ onEnergyChange: @escaping (Double) -> Void) -> some Gesture {
+    private func dragGesture(_ onMoodChange: @escaping (Double) -> Void) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
                 let dx = Double(value.location.x - cx)
@@ -152,16 +152,16 @@ struct GaugeView: View {
                 if angleDeg < 0 {
                     angleDeg = dx >= 0 ? 0 : 180
                 }
-                onEnergyChange(((180 - angleDeg) / 180 * 100).rounded())
+                onMoodChange(((180 - angleDeg) / 180 * 100).rounded())
             }
     }
 }
 
 #Preview {
     VStack(spacing: 20) {
-        GaugeView(energy: 20, flavour: 0.5)
-        GaugeView(energy: 50, flavour: 0.5)
-        GaugeView(energy: 92, flavour: 0.1)
+        GaugeView(mood: 20, flavour: 0.5)
+        GaugeView(mood: 50, flavour: 0.5)
+        GaugeView(mood: 92, flavour: 0.1)
     }
     .padding(40)
 }

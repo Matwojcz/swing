@@ -25,15 +25,16 @@ struct HistoryListView: View {
                     ScrollViewReader { scrollProxy in
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: 0) {
-                                Spacer(minLength: 40)
                                 ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                                     HistoryEntryRow(entry: entry)
+                                        .padding(.horizontal, 8)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                                 .stroke(
                                                     MoodColor.color(mood: entry.mood, flavour: entry.flavour),
                                                     lineWidth: selectedEntry?.id == entry.id ? 2 : 0
                                                 )
+                                                .padding(.horizontal, 8)
                                         )
                                         .scaleEffect(rowScale(for: index), anchor: .center)
                                         .animation(.easeOut(duration: 0.15), value: hoverLocation)
@@ -62,6 +63,7 @@ struct HistoryListView: View {
                             .frame(minHeight: proxy.size.height)
                             .onPreferenceChange(RowFrameKey.self) { rowFrames = $0 }
                         }
+                                                .scrollClipDisabled()
                         .coordinateSpace(name: "historyList")
                         .onContinuousHover { phase in
                             switch phase {

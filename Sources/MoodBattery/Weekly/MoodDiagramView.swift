@@ -189,6 +189,19 @@ struct MoodDiagramView: View {
         var date: Date
     }
 
+    private struct DayKey: Hashable {
+        let year: Int
+        let month: Int
+        let day: Int
+    }
+
+    private var entriesByDay: [DayKey: [MoodEntry]] {
+        Dictionary(grouping: entries) { entry in
+            let comps = calendar.dateComponents([.year, .month, .day], from: entry.timestamp)
+            return DayKey(year: comps.year!, month: comps.month!, day: comps.day!)
+        }
+    }
+
     private func dataPoints(for days: [Date]) -> [DataPoint] {
         switch scale {
         case .week, .month:
@@ -199,9 +212,11 @@ struct MoodDiagramView: View {
     }
 
     private func dailyAverages(for days: [Date]) -> [DataPoint] {
-        days.enumerated().compactMap { index, day in
-            let dayEntries = entries.filter { calendar.isDate($0.timestamp, inSameDayAs: day) }
-            guard !dayEntries.isEmpty else { return nil }
+        let grouped = entriesByDay
+        return days.enumerated().compactMap { index, day in
+            let comps = calendar.dateComponents([.year, .month, .day], from: day)
+            let key = DayKey(year: comps.year!, month: comps.month!, day: comps.day!)
+            guard let dayEntries = grouped[key], !dayEntries.isEmpty else { return nil }
             let count = Double(dayEntries.count)
             return DataPoint(
                 dayIndex: index,
@@ -228,6 +243,7 @@ struct MoodDiagramView: View {
     }
 
     private func weeklyAverages(for days: [Date]) -> [DataPoint] {
+        let grouped = entriesByDay
         var points: [DataPoint] = []
         let chunkSize = 7
         let chunkCount = days.count / chunkSize
@@ -241,11 +257,14 @@ struct MoodDiagramView: View {
 
             for i in startIdx..<(startIdx + chunkSize) {
                 let day = days[i]
-                let dayEntries = entries.filter { calendar.isDate($0.timestamp, inSameDayAs: day) }
-                for e in dayEntries {
-                    moodSum += e.mood
-                    flavourSum += e.flavour
-                    count += 1
+                let comps = calendar.dateComponents([.year, .month, .day], from: day)
+                let key = DayKey(year: comps.year!, month: comps.month!, day: comps.day!)
+                if let dayEntries = grouped[key] {
+                    for e in dayEntries {
+                        moodSum += e.mood
+                        flavourSum += e.flavour
+                        count += 1
+                    }
                 }
             }
 

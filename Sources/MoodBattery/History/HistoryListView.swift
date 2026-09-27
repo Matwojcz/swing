@@ -12,6 +12,7 @@ struct HistoryListView: View {
 
     private let maxScale: CGFloat = 1.05
     private let magnifyRadius: CGFloat = 120
+    private let estimatedRowHeight: CGFloat = 54
 
     var body: some View {
         Group {
@@ -21,65 +22,52 @@ struct HistoryListView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                GeometryReader { proxy in
-                    ScrollViewReader { scrollProxy in
-                        ScrollView(showsIndicators: false) {
-                            VStack(spacing: 0) {
-                                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                                    HistoryEntryRow(entry: entry)
-                                        .padding(.horizontal, 8)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(
-                                                    MoodColor.color(mood: entry.mood, flavour: entry.flavour),
-                                                    lineWidth: selectedEntry?.id == entry.id ? 2 : 0
-                                                )
-                                                .padding(.horizontal, 8)
-                                        )
-                                        .scaleEffect(rowScale(for: index), anchor: .center)
-                                        .animation(.easeOut(duration: 0.15), value: hoverLocation)
-                                        .id(entry.id)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture { onSelect?(entry) }
-                                        .contextMenu {
-                                            Button(role: .destructive) {
-                                                onDelete?(entry)
-                                            } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
-                                        }
-                                        .background(GeometryReader { geo in
-                                            Color.clear.preference(
-                                                key: RowFrameKey.self,
-                                                value: [index: geo.frame(in: .named("historyList"))]
+                ScrollViewReader { scrollProxy in
+                    ScrollView(showsIndicators: false) {
+                        LazyVStack(spacing: 8) {
+                            ForEach(entries) { entry in
+                                let index = entryIndex(entry)
+                                HistoryEntryRow(entry: entry)
+                                    .padding(.horizontal, 8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(
+                                                MoodColor.color(mood: entry.mood, flavour: entry.flavour),
+                                                lineWidth: selectedEntry?.id == entry.id ? 2 : 0
                                             )
-                                        })
-                                    if index < entries.count - 1 {
-                                        Spacer(minLength: 8)
+                                            .padding(.horizontal, 8)
+                                    )
+                                    .scaleEffect(rowScale(for: index), anchor: .center)
+                                    .animation(.easeOut(duration: 0.15), value: hoverLocation)
+                                    .id(entry.id)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { onSelect?(entry) }
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            onDelete?(entry)
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
                                     }
-                                }
-                                Spacer(minLength: 40)
-                            }
-                            .frame(minHeight: proxy.size.height)
-                            .onPreferenceChange(RowFrameKey.self) { rowFrames = $0 }
-                        }
-                                                .scrollClipDisabled()
-                        .coordinateSpace(name: "historyList")
-                        .onContinuousHover { phase in
-                            switch phase {
-                            case .active(let location):
-                                hoverLocation = location
-                                isHovering = true
-                            case .ended:
-                                hoverLocation = nil
-                                isHovering = false
                             }
                         }
-                        .onChange(of: scrollToEntry?.id) { _, newId in
-                            if let newId {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    scrollProxy.scrollTo(newId, anchor: .center)
-                                }
+                        .padding(.bottom, 40)
+                    }
+                    .scrollClipDisabled()
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            hoverLocation = location
+                            isHovering = true
+                        case .ended:
+                            hoverLocation = nil
+                            isHovering = false
+                        }
+                    }
+                    .onChange(of: scrollToEntry?.id) { _, newId in
+                        if let newId {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                scrollProxy.scrollTo(newId, anchor: .center)
                             }
                         }
                     }
@@ -91,13 +79,14 @@ struct HistoryListView: View {
 
     // MARK: - Magnification
 
-    @State private var rowFrames: [Int: CGRect] = [:]
+    private func entryIndex(_ entry: MoodEntry) -> Int {
+        entries.firstIndex(where: { $0.id == entry.id }) ?? 0
+    }
 
     private func rowScale(for index: Int) -> CGFloat {
-        guard isHovering, let cursor = hoverLocation,
-              let frame = rowFrames[index] else { return 1.0 }
+        guard isHovering, let cursor = hoverLocation else { return 1.0 }
 
-        let rowCenterY = frame.midY
+        let rowCenterY = CGFloat(index) * estimatedRowHeight + estimatedRowHeight / 2
         let distance = abs(cursor.y - rowCenterY)
 
         guard distance < magnifyRadius else { return 1.0 }
@@ -119,13 +108,6 @@ struct HistoryListView: View {
             startPoint: .top,
             endPoint: .bottom
         )
-    }
-}
-
-private struct RowFrameKey: PreferenceKey {
-    static var defaultValue: [Int: CGRect] = [:]
-    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
-        value.merge(nextValue()) { $1 }
     }
 }
 

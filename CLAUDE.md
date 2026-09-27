@@ -49,15 +49,19 @@ language reference but is not the active UI.
 9. **Data export** — export all entries as CSV or JSON via NSSavePanel.
 10. **MCP server** — Python server for Claude integration, supports
     logging, querying, updating, and deleting entries.
+11. **Keyboard navigation** — arrow keys to flick through entries in the
+    detail panel (up = forward, down = back), ESC to close panel or
+    cancel inline edit. Selecting an entry scrolls the diagram to its week.
+12. **Performance optimizations** — lazy history list, eliminated
+    GeometryReader preference feedback loop, pre-grouped entry lookup
+    for diagram data points.
 
 ## Planned features
 
-11. **iCloud backup** — move SQLite to an iCloud Drive container for
+13. **iCloud backup** — move SQLite to an iCloud Drive container for
     automatic cloud backup.
-12. **Diary function** — richer free-text notes attached to entries,
+14. **Diary function** — richer free-text notes attached to entries,
     searchable.
-13. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
-    Never present pattern detection as a clinical claim.
 
 ## Tone and framing rules
 

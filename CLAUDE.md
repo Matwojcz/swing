@@ -41,8 +41,7 @@ language reference but is not the active UI.
    showing full note/title with inline editing, delete, and mood data.
 5. **Markdown import** — import .md diary files with preview sheet;
    parses dates, mood/flavour from fields or text sentiment.
-6. **Notes** — title and free-text note fields on entries (diary
-   function minus search).
+6. **Notes** — title and free-text note fields on entries.
 
 ## Planned features (roughly in build order)
 
@@ -52,9 +51,6 @@ language reference but is not the active UI.
    when one already exists for that calendar day.
 9. **Retrospective entries** — tap a date in the weekly diagram to open
    the logger pre-filled with that date, allowing past-day entries.
-10. **Note search** — search/filter entries by note and title text.
-11. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
-    Never present pattern detection as a clinical claim.
 
 ## Tone and framing rules
 

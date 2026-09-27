@@ -616,12 +616,23 @@ struct MoodDiagramView: View {
         return merged
     }
 
-    private func episodesForPage(_ days: [Date]) -> [(startIndex: Int, endIndex: Int, episode: Episode)] {
+    private struct PageEpisode {
+        var startIndex: Int
+        var endIndex: Int
+        var extendsLeft: Bool
+        var extendsRight: Bool
+        var episode: Episode
+    }
+
+    private func episodesForPage(_ days: [Date]) -> [PageEpisode] {
         guard let pageStart = days.first, let pageEnd = days.last else { return [] }
-        var result: [(startIndex: Int, endIndex: Int, episode: Episode)] = []
+        var result: [PageEpisode] = []
 
         for ep in globalEpisodes {
             if ep.endDate < pageStart || ep.startDate > pageEnd { continue }
+
+            let extendsLeft = ep.startDate < pageStart
+            let extendsRight = ep.endDate > pageEnd
 
             let clippedStart = max(ep.startDate, pageStart)
             let clippedEnd = min(ep.endDate, pageEnd)
@@ -629,44 +640,49 @@ struct MoodDiagramView: View {
             let startIdx = max(0, calendar.dateComponents([.day], from: pageStart, to: clippedStart).day ?? 0)
             let endIdx = min(days.count - 1, calendar.dateComponents([.day], from: pageStart, to: clippedEnd).day ?? 0)
 
-            result.append((startIndex: startIdx, endIndex: endIdx, episode: ep))
+            result.append(PageEpisode(startIndex: startIdx, endIndex: endIdx, extendsLeft: extendsLeft, extendsRight: extendsRight, episode: ep))
         }
         return result
     }
 
-    private func drawEpisodes(_ pageEpisodes: [(startIndex: Int, endIndex: Int, episode: Episode)], in context: GraphicsContext, size: CGSize) {
+    private func drawEpisodes(_ pageEpisodes: [PageEpisode], in context: GraphicsContext, size: CGSize) {
         let totalDays = scale.dayCount
         let fadeWidth: CGFloat = 12
 
         for item in pageEpisodes {
-            let left = x(forDayIndex: item.startIndex, totalDays: totalDays, width: size.width) - 4
-            let right = x(forDayIndex: item.endIndex, totalDays: totalDays, width: size.width) + 4
+            let left = item.extendsLeft ? 0 : x(forDayIndex: item.startIndex, totalDays: totalDays, width: size.width) - 4
+            let right = item.extendsRight ? size.width : x(forDayIndex: item.endIndex, totalDays: totalDays, width: size.width) + 4
             let rect = CGRect(x: left, y: 0, width: right - left, height: size.height)
 
             let baseColor = MoodColor.color(mood: item.episode.averageMood, flavour: item.episode.averageFlavour)
             let bandColor = baseColor.opacity(0.12)
 
-            context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(bandColor))
+            let cornerRadius: CGFloat = (item.extendsLeft || item.extendsRight) ? 0 : 4
+            context.fill(Path(roundedRect: rect, cornerRadius: cornerRadius), with: .color(bandColor))
 
             if rect.width > fadeWidth * 2 {
-                let fadeLeft = CGRect(x: left, y: 0, width: fadeWidth, height: size.height)
-                context.fill(
-                    Path(fadeLeft),
-                    with: .linearGradient(
-                        Gradient(colors: [.clear, bandColor]),
-                        startPoint: CGPoint(x: left, y: 0),
-                        endPoint: CGPoint(x: left + fadeWidth, y: 0)
+                if !item.extendsLeft {
+                    let fadeLeft = CGRect(x: left, y: 0, width: fadeWidth, height: size.height)
+                    context.fill(
+                        Path(fadeLeft),
+                        with: .linearGradient(
+                            Gradient(colors: [.clear, bandColor]),
+                            startPoint: CGPoint(x: left, y: 0),
+                            endPoint: CGPoint(x: left + fadeWidth, y: 0)
+                        )
                     )
-                )
-                let fadeRight = CGRect(x: right - fadeWidth, y: 0, width: fadeWidth, height: size.height)
-                context.fill(
-                    Path(fadeRight),
-                    with: .linearGradient(
-                        Gradient(colors: [bandColor, .clear]),
-                        startPoint: CGPoint(x: right - fadeWidth, y: 0),
-                        endPoint: CGPoint(x: right, y: 0)
+                }
+                if !item.extendsRight {
+                    let fadeRight = CGRect(x: right - fadeWidth, y: 0, width: fadeWidth, height: size.height)
+                    context.fill(
+                        Path(fadeRight),
+                        with: .linearGradient(
+                            Gradient(colors: [bandColor, .clear]),
+                            startPoint: CGPoint(x: right - fadeWidth, y: 0),
+                            endPoint: CGPoint(x: right, y: 0)
+                        )
                     )
-                )
+                }
             }
         }
     }

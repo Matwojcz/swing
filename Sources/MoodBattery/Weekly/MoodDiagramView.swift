@@ -121,6 +121,8 @@ struct MoodDiagramView: View {
             tappablePoints = boundary.tappable
         }
 
+        let episodes = detectEpisodes(for: days)
+
         return VStack(spacing: 4) {
             ZStack {
                 if drawingPoints.isEmpty {
@@ -129,6 +131,7 @@ struct MoodDiagramView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     Canvas { context, size in
+                        drawEpisodes(episodes, days: days, in: context, size: size)
                         drawBaseline(in: context, size: size)
                         drawSeries(drawingPoints, in: context, size: size,
                                    dotRange: 0..<scale.dayCount)
@@ -160,23 +163,54 @@ struct MoodDiagramView: View {
                             }
                         }
                     }
+                } else if scale == .month {
+                    GeometryReader { geo in
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { location in
+                                let dayIdx = Int(location.x / geo.size.width * CGFloat(scale.dayCount))
+                                let clampedIdx = max(0, min(scale.dayCount - 1, dayIdx))
+                                let tappedDate = days[clampedIdx]
+                                zoomToDate(tappedDate, from: .month)
+                            }
+                    }
                 } else {
                     GeometryReader { geo in
-                        ForEach(tappablePoints, id: \.dayIndex) { dp in
-                            let px = x(forDayIndex: dp.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
-                            let py = y(for: dp.mood, height: geo.size.height)
-                            Color.clear
-                                .frame(width: 28, height: 28)
-                                .contentShape(Rectangle())
-                                .position(x: px, y: py)
-                                .onTapGesture { onSelectDate?(dp.date) }
-                        }
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { location in
+                                let dayIdx = Int(location.x / geo.size.width * CGFloat(scale.dayCount))
+                                let clampedIdx = max(0, min(scale.dayCount - 1, dayIdx))
+                                let tappedDate = days[clampedIdx]
+                                zoomToDate(tappedDate, from: .year)
+                            }
                     }
                 }
             }
             .frame(height: height)
 
             dayLabels(for: days)
+        }
+    }
+
+    private func zoomToDate(_ date: Date, from currentScale: DiagramScale) {
+        let today = calendar.startOfDay(for: Date())
+        let target = calendar.startOfDay(for: date)
+        let daysBetween = calendar.dateComponents([.day], from: target, to: today).day ?? 0
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            switch currentScale {
+            case .year:
+                scale = .month
+                let monthPage = (pageCount - 1) - (daysBetween / 30)
+                currentPage = max(0, min(pageCount - 1, monthPage))
+            case .month:
+                scale = .week
+                let weekPage = (pageCount - 1) - (daysBetween / 7)
+                currentPage = max(0, min(pageCount - 1, weekPage))
+            case .week:
+                break
+            }
         }
     }
 
@@ -460,6 +494,135 @@ struct MoodDiagramView: View {
         path.addLine(to: CGPoint(x: size.width, y: baselineY))
         context.stroke(path, with: .color(.white.opacity(0.35)),
                        style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+    }
+
+    // MARK: - Episode detection
+
+    private enum EpisodeType {
+        case depressive, elevated
+    }
+
+    private struct Episode {
+        var startIndex: Int
+        var endIndex: Int
+        var type: EpisodeType
+        var averageMood: Double
+        var averageFlavour: Double
+    }
+
+    private func detectEpisodes(for days: [Date]) -> [Episode] {
+        let grouped = entriesByDay
+        let moods: [(index: Int, mood: Double, flavour: Double)?] = days.enumerated().map { idx, day in
+            let comps = calendar.dateComponents([.year, .month, .day], from: day)
+            let key = DayKey(year: comps.year!, month: comps.month!, day: comps.day!)
+            guard let dayEntries = grouped[key], !dayEntries.isEmpty else { return nil }
+            let count = Double(dayEntries.count)
+            let avgMood = dayEntries.reduce(0) { $0 + $1.mood } / count
+            let avgFlavour = dayEntries.reduce(0) { $0 + $1.flavour } / count
+            return (idx, avgMood, avgFlavour)
+        }
+
+        var episodes: [Episode] = []
+
+        func scan(threshold: Double, below: Bool) -> [Episode] {
+            var result: [Episode] = []
+            let windowSize = 5
+            guard moods.count >= windowSize else { return result }
+
+            var inEpisode = false
+            var episodeStart = 0
+            var lastEnd = 0
+
+            for i in 0...(moods.count - windowSize) {
+                var qualifying = 0
+                for j in i..<(i + windowSize) {
+                    guard let m = moods[j] else { continue }
+                    if below ? m.mood < threshold : m.mood > threshold {
+                        qualifying += 1
+                    }
+                }
+
+                if qualifying >= 4 {
+                    if !inEpisode {
+                        inEpisode = true
+                        episodeStart = i
+                    }
+                    lastEnd = i + windowSize - 1
+                } else if inEpisode {
+                    let endIdx = min(lastEnd, moods.count - 1)
+                    var moodAcc = 0.0, flavourAcc = 0.0, cnt = 0
+                    for j in episodeStart...endIdx {
+                        if let m = moods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
+                    }
+                    result.append(Episode(
+                        startIndex: episodeStart,
+                        endIndex: endIdx,
+                        type: below ? .depressive : .elevated,
+                        averageMood: cnt > 0 ? moodAcc / Double(cnt) : threshold,
+                        averageFlavour: cnt > 0 ? flavourAcc / Double(cnt) : 0.5
+                    ))
+                    inEpisode = false
+                }
+            }
+
+            if inEpisode {
+                let endIdx = min(lastEnd, moods.count - 1)
+                var moodAcc = 0.0, flavourAcc = 0.0, cnt = 0
+                for j in episodeStart...endIdx {
+                    if let m = moods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
+                }
+                result.append(Episode(
+                    startIndex: episodeStart,
+                    endIndex: endIdx,
+                    type: below ? .depressive : .elevated,
+                    averageMood: cnt > 0 ? moodAcc / Double(cnt) : threshold,
+                    averageFlavour: cnt > 0 ? flavourAcc / Double(cnt) : 0.5
+                ))
+            }
+
+            return result
+        }
+
+        episodes.append(contentsOf: scan(threshold: 35, below: true))
+        episodes.append(contentsOf: scan(threshold: 70, below: false))
+        return episodes
+    }
+
+    private func drawEpisodes(_ episodes: [Episode], days: [Date], in context: GraphicsContext, size: CGSize) {
+        let totalDays = scale.dayCount
+        let fadeWidth: CGFloat = 12
+
+        for episode in episodes {
+            let left = x(forDayIndex: episode.startIndex, totalDays: totalDays, width: size.width) - 4
+            let right = x(forDayIndex: episode.endIndex, totalDays: totalDays, width: size.width) + 4
+            let rect = CGRect(x: left, y: 0, width: right - left, height: size.height)
+
+            let baseColor = MoodColor.color(mood: episode.averageMood, flavour: episode.averageFlavour)
+            let bandColor = baseColor.opacity(0.12)
+
+            context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(bandColor))
+
+            if rect.width > fadeWidth * 2 {
+                let fadeLeft = CGRect(x: left, y: 0, width: fadeWidth, height: size.height)
+                context.fill(
+                    Path(fadeLeft),
+                    with: .linearGradient(
+                        Gradient(colors: [.clear, bandColor]),
+                        startPoint: CGPoint(x: left, y: 0),
+                        endPoint: CGPoint(x: left + fadeWidth, y: 0)
+                    )
+                )
+                let fadeRight = CGRect(x: right - fadeWidth, y: 0, width: fadeWidth, height: size.height)
+                context.fill(
+                    Path(fadeRight),
+                    with: .linearGradient(
+                        Gradient(colors: [bandColor, .clear]),
+                        startPoint: CGPoint(x: right - fadeWidth, y: 0),
+                        endPoint: CGPoint(x: right, y: 0)
+                    )
+                )
+            }
+        }
     }
 
     private func drawSeries(_ points: [DataPoint], in context: GraphicsContext, size: CGSize, dotRange: Range<Int>? = nil) {

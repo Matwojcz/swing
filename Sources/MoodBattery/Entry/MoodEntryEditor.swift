@@ -14,6 +14,7 @@ struct MoodEntryEditor: View {
     @State private var note: String = ""
     @State private var saveError: String?
 
+    var targetDate: Date?
     var onSave: (() -> Void)?
 
     private let store = MoodEntryStore()
@@ -54,6 +55,12 @@ struct MoodEntryEditor: View {
                 .modifier(GlassFieldModifier())
 
             GrowingTextEditor(text: $note, placeholder: "Note")
+
+            if let targetDate {
+                Text("Logging for \(Self.dateLabel.string(from: targetDate))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Button("Log entry", action: save)
                 .modifier(GlassButtonModifier())
@@ -112,16 +119,24 @@ struct MoodEntryEditor: View {
         )
     }
 
+    private var entryDate: Date {
+        targetDate ?? Date()
+    }
+
     private func save() {
-        let entry = MoodEntry(
-            id: nil,
-            mood: mood,
-            flavour: flavour,
-            title: title.isEmpty ? nil : title,
-            note: note.isEmpty ? nil : note,
-            timestamp: Date()
-        )
         do {
+            if try store.hasEntry(on: entryDate) {
+                saveError = "An entry already exists for this day."
+                return
+            }
+            let entry = MoodEntry(
+                id: nil,
+                mood: mood,
+                flavour: flavour,
+                title: title.isEmpty ? nil : title,
+                note: note.isEmpty ? nil : note,
+                timestamp: entryDate
+            )
             try store.save(entry)
             title = ""
             note = ""
@@ -131,6 +146,12 @@ struct MoodEntryEditor: View {
             saveError = "Couldn't save: \(error.localizedDescription)"
         }
     }
+
+    private static let dateLabel: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f
+    }()
 }
 
 #Preview {

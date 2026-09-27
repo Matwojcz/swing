@@ -32,23 +32,32 @@ language reference but is not the active UI.
 
 ## Completed features
 
-1. **Logging** — save a mood entry (energy, flavour, optional note,
-   timestamp) to the local database.
-2. **History view** — scrollable, mood-colored entry list with fade masks
-   at top and bottom edges.
-3. **Weekly diagram** — energy over time, per-day averaged, line colored
-   via the same MoodColor stops so it visually echoes the gauge.
-
-## Planned features (roughly in build order)
-
+1. **Logging** — save a mood entry (mood 0–100, flavour 0–1, optional
+   title and note, timestamp) to the local database.
+2. **History view** — scrollable, mood-colored entry list with date
+   column, Dock-style magnification on hover, bottom fade mask, and
+   liquid glass effects (macOS 26+).
+3. **Weekly/monthly/yearly diagram** — mood over time, per-day or
+   per-week averaged, line colored via the same MoodColor stops so it
+   visually echoes the gauge. Clickable dots to select entries.
 4. **Entry detail panel** — tap a history entry to open a side panel
-   showing the full note and entry data.
-5. **Diary function** — richer free-text notes attached to entries,
+   showing the full note and entry data. Double-click any field (mood,
+   flavour, title, note) to edit inline.
+5. **Markdown import** — import existing diary files (.md) to extract
+   and backfill entries with dates, with preview before confirming.
+6. **MCP server** — Python server for Claude integration, supports
+   logging, querying, updating, and deleting entries.
+
+## Planned features
+
+7. **Diagram gap fix** — connect the mood line across page boundaries
+   so there's no visual break between weeks/months.
+8. **iCloud backup** — move SQLite to an iCloud Drive container for
+   automatic cloud backup.
+9. **Diary function** — richer free-text notes attached to entries,
    searchable.
-6. **Markdown import** — import existing diary files (.md) to extract
-   and backfill entries with dates.
-7. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
-   Never present pattern detection as a clinical claim.
+10. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
+    Never present pattern detection as a clinical claim.
 
 ## Tone and framing rules
 

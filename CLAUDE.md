@@ -41,14 +41,20 @@ language reference but is not the active UI.
 
 ## Planned features (roughly in build order)
 
-4. **Entry detail panel** — tap a history entry to open a side panel
+4. **Delete-all confirmation** — show a warning/confirmation dialog
+   before deleting all entries.
+5. **One entry per day** — block the logger from adding a second entry
+   when one already exists for that calendar day.
+6. **Retrospective entries** — tap a date in the weekly diagram to open
+   the logger pre-filled with that date, allowing past-day entries.
+7. **Entry detail panel** — tap a history entry to open a side panel
    showing the full note and entry data.
-5. **Diary function** — richer free-text notes attached to entries,
+8. **Diary function** — richer free-text notes attached to entries,
    searchable.
-6. **Markdown import** — import existing diary files (.md) to extract
+9. **Markdown import** — import existing diary files (.md) to extract
    and backfill entries with dates.
-7. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
-   Never present pattern detection as a clinical claim.
+10. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
+    Never present pattern detection as a clinical claim.
 
 ## Tone and framing rules
 

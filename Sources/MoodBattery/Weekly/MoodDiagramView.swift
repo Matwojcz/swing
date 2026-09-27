@@ -48,17 +48,15 @@ struct MoodDiagramView: View {
 
         if page > 0 {
             let prevDays = daysForPage(page - 1)
-            if let last = prevDays.last {
-                extended.insert(last, at: 0)
-                ownStartIndex = 1
-            }
+            let tail = prevDays.suffix(3)
+            extended.insert(contentsOf: tail, at: 0)
+            ownStartIndex = tail.count
         }
 
         if page < pageCount - 1 {
             let nextDays = daysForPage(page + 1)
-            if let first = nextDays.first {
-                extended.append(first)
-            }
+            let head = nextDays.prefix(3)
+            extended.append(contentsOf: head)
         }
 
         return (extended, ownStartIndex)
@@ -125,7 +123,34 @@ struct MoodDiagramView: View {
                         drawSeries(drawingPoints, in: context, size: size,
                                    dotRange: 0..<scale.dayCount)
                     }
+                }
 
+                if scale == .week {
+                    GeometryReader { geo in
+                        let tappableSet = Set(tappablePoints.map(\.dayIndex))
+                        ForEach(tappablePoints, id: \.dayIndex) { dp in
+                            let px = x(forDayIndex: dp.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
+                            let py = y(for: dp.mood, height: geo.size.height)
+                            Color.clear
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                                .position(x: px, y: py)
+                                .onTapGesture { onSelectDate?(dp.date) }
+                        }
+
+                        ForEach(0..<scale.dayCount, id: \.self) { dayIdx in
+                            if !tappableSet.contains(dayIdx) {
+                                let px = x(forDayIndex: dayIdx, totalDays: scale.dayCount, width: geo.size.width)
+                                let baselineY = y(for: 50, height: geo.size.height)
+                                Color.clear
+                                    .frame(width: 28, height: 28)
+                                    .contentShape(Rectangle())
+                                    .position(x: px, y: baselineY)
+                                    .onTapGesture { onSelectDate?(days[dayIdx]) }
+                            }
+                        }
+                    }
+                } else {
                     GeometryReader { geo in
                         ForEach(tappablePoints, id: \.dayIndex) { dp in
                             let px = x(forDayIndex: dp.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
@@ -290,6 +315,8 @@ struct MoodDiagramView: View {
                         .font(.system(size: 10, weight: calendar.isDateInToday(day) ? .medium : .regular))
                         .foregroundStyle(calendar.isDateInToday(day) ? .primary : .secondary)
                         .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .onTapGesture { onSelectDate?(day) }
                 }
             case .month:
                 ForEach([0, 7, 14, 21, 29], id: \.self) { idx in

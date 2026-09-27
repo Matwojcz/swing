@@ -4,49 +4,28 @@ struct GrowingTextEditor: View {
     @Binding var text: String
     var placeholder: String = ""
 
-    @State private var textHeight: CGFloat = 28
-
-    private let minHeight: CGFloat = 28
-    private let maxHeight: CGFloat = 160
     private let horizontalPadding: CGFloat = 8
     private let verticalPadding: CGFloat = 6
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            if text.isEmpty {
-                Text(placeholder)
-                    .foregroundStyle(.tertiary)
-                    .font(.system(size: 13))
-                    .padding(.horizontal, horizontalPadding + 4)
-                    .padding(.vertical, verticalPadding + 2)
+        TextEditor(text: $text)
+            .font(.system(size: 13))
+            .scrollContentBackground(.hidden)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+            .frame(minHeight: 32, maxHeight: 160)
+            .fixedSize(horizontal: false, vertical: true)
+            .overlay(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text(placeholder)
+                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, horizontalPadding + 4)
+                        .padding(.vertical, verticalPadding + 2)
+                        .allowsHitTesting(false)
+                }
             }
-
-            Text(text.isEmpty ? " " : text)
-                .font(.system(size: 13))
-                .padding(.horizontal, horizontalPadding + 4)
-                .padding(.vertical, verticalPadding + 2)
-                .opacity(0)
-                .background(GeometryReader { geo in
-                    Color.clear.preference(key: HeightKey.self, value: geo.size.height)
-                })
-
-            TextEditor(text: $text)
-                .font(.system(size: 13))
-                .scrollContentBackground(.hidden)
-                .scrollDisabled(textHeight <= maxHeight)
-                .padding(.horizontal, horizontalPadding)
-                .padding(.vertical, verticalPadding)
-                .frame(height: max(minHeight, min(textHeight, maxHeight)))
-        }
-        .modifier(GlassFieldModifier())
-        .onPreferenceChange(HeightKey.self) { textHeight = $0 }
-    }
-
-    private struct HeightKey: PreferenceKey {
-        static var defaultValue: CGFloat = 28
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-            value = nextValue()
-        }
+            .modifier(GlassFieldModifier())
     }
 }
 

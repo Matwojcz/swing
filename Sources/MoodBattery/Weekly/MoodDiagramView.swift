@@ -19,6 +19,7 @@ enum DiagramScale: String, CaseIterable {
 struct MoodDiagramView: View {
     let entries: [MoodEntry]
     var onSelectDate: ((Date) -> Void)?
+    var scrollToDate: Date?
 
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
@@ -90,6 +91,15 @@ struct MoodDiagramView: View {
         .gesture(pinchGesture)
         .onChange(of: scale) { _, _ in
             currentPage = pageCount - 1
+        }
+        .onChange(of: scrollToDate) { _, date in
+            guard let date else { return }
+            scale = .week
+            let today = calendar.startOfDay(for: Date())
+            let target = calendar.startOfDay(for: date)
+            let daysBetween = calendar.dateComponents([.day], from: target, to: today).day ?? 0
+            let weekPage = (pageCount - 1) - (daysBetween / 7)
+            currentPage = max(0, min(pageCount - 1, weekPage))
         }
     }
 

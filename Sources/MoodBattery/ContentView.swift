@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var importError: String?
     @State private var showClearConfirmation = false
     @State private var retroDate: Date?
+    @State private var diagramScrollDate: Date?
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
@@ -29,13 +30,14 @@ struct ContentView: View {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selectedEntry = entry
                                 scrollToEntry = entry
+                                diagramScrollDate = entry.timestamp
                             }
                         } else {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 retroDate = date
                             }
                         }
-                    })
+                    }, scrollToDate: diagramScrollDate)
                     .padding(.horizontal, 16)
                 }
 
@@ -62,6 +64,10 @@ struct ContentView: View {
                         try? store.save(updated)
                         reload()
                         selectedEntry = updated
+                    }, onPrevious: {
+                        navigateEntry(direction: -1)
+                    }, onNext: {
+                        navigateEntry(direction: 1)
                     })
                     .transition(.opacity)
                 }
@@ -74,6 +80,7 @@ struct ContentView: View {
                 onSelect: { entry in
                     withAnimation(.easeInOut(duration: 0.25)) {
                         selectedEntry = entry
+                        diagramScrollDate = entry.timestamp
                     }
                 },
                 onDelete: { entry in
@@ -189,6 +196,19 @@ struct ContentView: View {
             try? store.save(entry)
         }
         reload()
+    }
+
+    private func navigateEntry(direction: Int) {
+        guard let current = selectedEntry,
+              let idx = entries.firstIndex(where: { $0.id == current.id }) else { return }
+        let newIdx = idx + direction
+        guard entries.indices.contains(newIdx) else { return }
+        let next = entries[newIdx]
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedEntry = next
+            scrollToEntry = next
+            diagramScrollDate = next.timestamp
+        }
     }
 
     private func clearAllData() {

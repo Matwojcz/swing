@@ -5,6 +5,8 @@ struct EntryDetailPanel: View {
     var onClose: () -> Void
     var onDelete: (() -> Void)?
     var onUpdate: ((MoodEntry) -> Void)?
+    var onPrevious: (() -> Void)?
+    var onNext: (() -> Void)?
 
     @State private var editingField: EditField?
     @State private var draftMood: String = ""
@@ -51,6 +53,25 @@ struct EntryDetailPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .modifier(GlassPanelModifier())
         .shadow(color: .black.opacity(0.25), radius: 20, x: 4, y: 0)
+        .focusable(editingField == nil)
+        .focusEffectDisabled()
+        .onExitCommand {
+            if editingField != nil {
+                editingField = nil
+            } else {
+                onClose()
+            }
+        }
+        .onKeyPress(.upArrow) {
+            guard editingField == nil else { return .ignored }
+            onPrevious?()
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            guard editingField == nil else { return .ignored }
+            onNext?()
+            return .handled
+        }
     }
 
     private var header: some View {

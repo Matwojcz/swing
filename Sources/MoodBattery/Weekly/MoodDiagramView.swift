@@ -89,9 +89,6 @@ struct MoodDiagramView: View {
                 .padding(.top, 8)
         }
         .gesture(pinchGesture)
-        .onChange(of: scale) { _, _ in
-            currentPage = pageCount - 1
-        }
         .onChange(of: scrollToDate) { _, date in
             guard let date else { return }
             scale = .week
@@ -424,6 +421,7 @@ struct MoodDiagramView: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         scale = s
+                        currentPage = pageCount - 1
                     }
                 } label: {
                     Text(s.label)
@@ -584,7 +582,7 @@ struct MoodDiagramView: View {
         }
 
         episodes.append(contentsOf: scan(threshold: 35, below: true))
-        episodes.append(contentsOf: scan(threshold: 70, below: false))
+        episodes.append(contentsOf: scan(threshold: 65, below: false))
         return episodes
     }
 

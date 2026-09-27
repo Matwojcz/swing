@@ -13,6 +13,7 @@ struct EntryDetailPanel: View {
     @State private var draftFlavour: String = ""
     @State private var draftTitle: String = ""
     @State private var draftNote: String = ""
+    @FocusState private var panelFocused: Bool
 
     private enum EditField: Equatable { case mood, flavour, title, note }
 
@@ -53,8 +54,14 @@ struct EntryDetailPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .modifier(GlassPanelModifier())
         .shadow(color: .black.opacity(0.25), radius: 20, x: 4, y: 0)
-        .focusable(editingField == nil)
+        .focusable()
+        .focused($panelFocused)
         .focusEffectDisabled()
+        .onAppear { panelFocused = true }
+        .onChange(of: entry.id) { _, _ in panelFocused = true }
+        .onChange(of: editingField) { _, newField in
+            if newField == nil { panelFocused = true }
+        }
         .onExitCommand {
             if editingField != nil {
                 editingField = nil

@@ -42,15 +42,13 @@ language reference but is not the active UI.
 5. **Markdown import** — import .md diary files with preview sheet;
    parses dates, mood/flavour from fields or text sentiment.
 6. **Notes** — title and free-text note fields on entries.
-
-## Planned features (roughly in build order)
-
-7. **Delete-all confirmation** — show a warning/confirmation dialog
-   before deleting all entries.
-8. **One entry per day** — block the logger from adding a second entry
-   when one already exists for that calendar day.
-9. **Retrospective entries** — tap a date in the weekly diagram to open
-   the logger pre-filled with that date, allowing past-day entries.
+7. **Delete-all confirmation** — warning dialog before clearing entries.
+8. **One entry per day** — blocks duplicate entries for the same day.
+9. **Retrospective entries** — tap an empty date in the diagram to log
+   for that past day.
+10. **Diagram line continuity** — lines connect across page boundaries
+    on week/month scales via boundary-day extension.
+11. **Data export** — export all entries as CSV or JSON via NSSavePanel.
 
 ## Tone and framing rules
 

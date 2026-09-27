@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var entries: [MoodEntry] = []
@@ -98,6 +99,9 @@ struct ContentView: View {
             }
             ToolbarItem {
                 Menu {
+                    Button("Export as CSV") { exportCSV() }
+                    Button("Export as JSON") { exportJSON() }
+                    Divider()
                     Button("Seed 6 months of dummy data") { seedDummyData() }
                     Button("Clear all entries", role: .destructive) { showClearConfirmation = true }
                 } label: {
@@ -191,6 +195,54 @@ struct ContentView: View {
         try? store.deleteAll()
         reload()
     }
+
+    private func exportCSV() {
+        let header = "id,mood,flavour,title,note,timestamp"
+        let rows = entries.map { e in
+            let fields: [String] = [
+                e.id.map(String.init) ?? "",
+                String(e.mood),
+                String(e.flavour),
+                csvEscape(e.title ?? ""),
+                csvEscape(e.note ?? ""),
+                Self.iso8601Formatter.string(from: e.timestamp)
+            ]
+            return fields.joined(separator: ",")
+        }
+        let csv = ([header] + rows).joined(separator: "\n")
+        saveFile(content: csv, defaultName: "mood-battery-export.csv", contentType: .commaSeparatedText)
+    }
+
+    private func exportJSON() {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(entries),
+              let json = String(data: data, encoding: .utf8) else { return }
+        saveFile(content: json, defaultName: "mood-battery-export.json", contentType: .json)
+    }
+
+    private func saveFile(content: String, defaultName: String, contentType: UTType) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [contentType]
+        panel.nameFieldStringValue = defaultName
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        try? content.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private func csvEscape(_ value: String) -> String {
+        if value.contains(",") || value.contains("\"") || value.contains("\n") {
+            return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
+        return value
+    }
+
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 
     private func confirmImport() {
         for entry in pendingImportEntries {

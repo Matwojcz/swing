@@ -41,6 +41,29 @@ struct MoodDiagramView: View {
         }
     }
 
+    private func extendedDaysForPage(_ page: Int) -> (all: [Date], ownStartIndex: Int) {
+        let own = daysForPage(page)
+        var extended = own
+        var ownStartIndex = 0
+
+        if page > 0 {
+            let prevDays = daysForPage(page - 1)
+            if let last = prevDays.last {
+                extended.insert(last, at: 0)
+                ownStartIndex = 1
+            }
+        }
+
+        if page < pageCount - 1 {
+            let nextDays = daysForPage(page + 1)
+            if let first = nextDays.first {
+                extended.append(first)
+            }
+        }
+
+        return (extended, ownStartIndex)
+    }
+
     private var visiblePage: Int {
         currentPage ?? (pageCount - 1)
     }
@@ -76,22 +99,35 @@ struct MoodDiagramView: View {
 
     private func diagramPage(page: Int) -> some View {
         let days = daysForPage(page)
-        let points = dataPoints(for: days)
+
+        let drawingPoints: [DataPoint]
+        let tappablePoints: [DataPoint]
+
+        if scale == .year {
+            let pts = dataPoints(for: days)
+            drawingPoints = pts
+            tappablePoints = pts
+        } else {
+            let boundary = boundaryDataPoints(for: page)
+            drawingPoints = boundary.drawing
+            tappablePoints = boundary.tappable
+        }
 
         return VStack(spacing: 4) {
             ZStack {
-                if points.isEmpty {
+                if drawingPoints.isEmpty {
                     Text("No entries for this period")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
                     Canvas { context, size in
                         drawBaseline(in: context, size: size)
-                        drawSeries(points, in: context, size: size)
+                        drawSeries(drawingPoints, in: context, size: size,
+                                   dotRange: 0..<scale.dayCount)
                     }
 
                     GeometryReader { geo in
-                        ForEach(points, id: \.dayIndex) { dp in
+                        ForEach(tappablePoints, id: \.dayIndex) { dp in
                             let px = x(forDayIndex: dp.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
                             let py = y(for: dp.mood, height: geo.size.height)
                             Color.clear
@@ -139,6 +175,21 @@ struct MoodDiagramView: View {
                 date: day
             )
         }
+    }
+
+    private func boundaryDataPoints(for page: Int) -> (drawing: [DataPoint], tappable: [DataPoint]) {
+        let (extDays, ownStart) = extendedDaysForPage(page)
+        let raw = dailyAverages(for: extDays)
+        let remapped = raw.map { dp in
+            DataPoint(
+                dayIndex: dp.dayIndex - ownStart,
+                mood: dp.mood,
+                flavour: dp.flavour,
+                date: dp.date
+            )
+        }
+        let tappable = remapped.filter { $0.dayIndex >= 0 && $0.dayIndex < scale.dayCount }
+        return (remapped, tappable)
     }
 
     private func weeklyAverages(for days: [Date]) -> [DataPoint] {
@@ -355,14 +406,14 @@ struct MoodDiagramView: View {
                        style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
     }
 
-    private func drawSeries(_ points: [DataPoint], in context: GraphicsContext, size: CGSize) {
+    private func drawSeries(_ points: [DataPoint], in context: GraphicsContext, size: CGSize, dotRange: Range<Int>? = nil) {
         let totalDays = scale.dayCount
-        let plotted = points.map { dp in
+        let plotted = points.enumerated().map { idx, dp in
             let pos = CGPoint(
                 x: x(forDayIndex: dp.dayIndex, totalDays: totalDays, width: size.width),
                 y: y(for: dp.mood, height: size.height)
             )
-            return (pos: pos, color: MoodColor.color(mood: dp.mood, flavour: dp.flavour))
+            return (pos: pos, color: MoodColor.color(mood: dp.mood, flavour: dp.flavour), dayIndex: dp.dayIndex)
         }
         guard !plotted.isEmpty else { return }
 
@@ -384,6 +435,7 @@ struct MoodDiagramView: View {
 
         let radius = scale == .year ? 3.0 : dotRadius
         for p in plotted {
+            if let dotRange, !dotRange.contains(p.dayIndex) { continue }
             let rect = CGRect(x: p.pos.x - radius, y: p.pos.y - radius,
                               width: radius * 2, height: radius * 2)
             context.fill(Path(ellipseIn: rect), with: .color(p.color))

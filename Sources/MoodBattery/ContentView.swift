@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var pendingImportEntries: [EditableImportEntry] = []
     @State private var showImportPreview = false
     @State private var importError: String?
+    @State private var showClearConfirmation = false
+    @State private var retroDate: Date?
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
@@ -16,13 +18,20 @@ struct ContentView: View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 VStack(alignment: .leading, spacing: 24) {
-                    MoodEntryEditor(onSave: reload)
+                    MoodEntryEditor(targetDate: retroDate, onSave: {
+                        retroDate = nil
+                        reload()
+                    })
                     MoodDiagramView(entries: entries, onSelectDate: { date in
                         let cal = Calendar.current
                         if let entry = entries.first(where: { cal.isDate($0.timestamp, inSameDayAs: date) }) {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selectedEntry = entry
                                 scrollToEntry = entry
+                            }
+                        } else {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                retroDate = date
                             }
                         }
                     })
@@ -90,7 +99,7 @@ struct ContentView: View {
             ToolbarItem {
                 Menu {
                     Button("Seed 6 months of dummy data") { seedDummyData() }
-                    Button("Clear all entries", role: .destructive) { clearAllData() }
+                    Button("Clear all entries", role: .destructive) { showClearConfirmation = true }
                 } label: {
                     Label("Data", systemImage: "ellipsis.circle")
                 }
@@ -117,6 +126,12 @@ struct ContentView: View {
             Button("OK") { importError = nil }
         } message: {
             Text(importError ?? "")
+        }
+        .alert("Delete all entries?", isPresented: $showClearConfirmation) {
+            Button("Delete all", role: .destructive) { clearAllData() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all mood entries. This cannot be undone.")
         }
     }
 

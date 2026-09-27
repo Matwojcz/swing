@@ -91,5 +91,4 @@ Sources/MoodBattery/
 
 ## License
 
-This project is not currently licensed for redistribution. All rights
-reserved.
+[MIT](LICENSE)

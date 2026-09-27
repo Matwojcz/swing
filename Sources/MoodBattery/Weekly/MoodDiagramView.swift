@@ -118,7 +118,7 @@ struct MoodDiagramView: View {
             tappablePoints = boundary.tappable
         }
 
-        let episodes = detectEpisodes(for: days)
+        let pageEpisodes = episodesForPage(days)
 
         return VStack(spacing: 4) {
             ZStack {
@@ -128,7 +128,7 @@ struct MoodDiagramView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     Canvas { context, size in
-                        drawEpisodes(episodes, days: days, in: context, size: size)
+                        drawEpisodes(pageEpisodes, in: context, size: size)
                         drawBaseline(in: context, size: size)
                         drawSeries(drawingPoints, in: context, size: size,
                                    dotRange: 0..<scale.dayCount)
@@ -501,40 +501,51 @@ struct MoodDiagramView: View {
     }
 
     private struct Episode {
-        var startIndex: Int
-        var endIndex: Int
+        var startDate: Date
+        var endDate: Date
         var type: EpisodeType
         var averageMood: Double
         var averageFlavour: Double
     }
 
-    private func detectEpisodes(for days: [Date]) -> [Episode] {
+    private var globalEpisodes: [Episode] {
         let grouped = entriesByDay
-        let moods: [(index: Int, mood: Double, flavour: Double)?] = days.enumerated().map { idx, day in
+        let sortedDates = entries.map { calendar.startOfDay(for: $0.timestamp) }
+        guard let earliest = sortedDates.min(), let latest = sortedDates.max() else { return [] }
+
+        let totalDays = (calendar.dateComponents([.day], from: earliest, to: latest).day ?? 0) + 1
+        guard totalDays >= 5 else { return [] }
+
+        let allDays = (0..<totalDays).map { calendar.date(byAdding: .day, value: $0, to: earliest)! }
+
+        struct DayMood {
+            var mood: Double
+            var flavour: Double
+        }
+        let dayMoods: [DayMood?] = allDays.map { day in
             let comps = calendar.dateComponents([.year, .month, .day], from: day)
             let key = DayKey(year: comps.year!, month: comps.month!, day: comps.day!)
             guard let dayEntries = grouped[key], !dayEntries.isEmpty else { return nil }
             let count = Double(dayEntries.count)
-            let avgMood = dayEntries.reduce(0) { $0 + $1.mood } / count
-            let avgFlavour = dayEntries.reduce(0) { $0 + $1.flavour } / count
-            return (idx, avgMood, avgFlavour)
+            return DayMood(
+                mood: dayEntries.reduce(0) { $0 + $1.mood } / count,
+                flavour: dayEntries.reduce(0) { $0 + $1.flavour } / count
+            )
         }
-
-        var episodes: [Episode] = []
 
         func scan(threshold: Double, below: Bool) -> [Episode] {
             var result: [Episode] = []
             let windowSize = 5
-            guard moods.count >= windowSize else { return result }
+            guard dayMoods.count >= windowSize else { return result }
 
             var inEpisode = false
             var episodeStart = 0
             var lastEnd = 0
 
-            for i in 0...(moods.count - windowSize) {
+            for i in 0...(dayMoods.count - windowSize) {
                 var qualifying = 0
                 for j in i..<(i + windowSize) {
-                    guard let m = moods[j] else { continue }
+                    guard let m = dayMoods[j] else { continue }
                     if below ? m.mood < threshold : m.mood > threshold {
                         qualifying += 1
                     }
@@ -547,14 +558,14 @@ struct MoodDiagramView: View {
                     }
                     lastEnd = i + windowSize - 1
                 } else if inEpisode {
-                    let endIdx = min(lastEnd, moods.count - 1)
+                    let endIdx = min(lastEnd, dayMoods.count - 1)
                     var moodAcc = 0.0, flavourAcc = 0.0, cnt = 0
                     for j in episodeStart...endIdx {
-                        if let m = moods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
+                        if let m = dayMoods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
                     }
                     result.append(Episode(
-                        startIndex: episodeStart,
-                        endIndex: endIdx,
+                        startDate: allDays[episodeStart],
+                        endDate: allDays[endIdx],
                         type: below ? .depressive : .elevated,
                         averageMood: cnt > 0 ? moodAcc / Double(cnt) : threshold,
                         averageFlavour: cnt > 0 ? flavourAcc / Double(cnt) : 0.5
@@ -564,14 +575,14 @@ struct MoodDiagramView: View {
             }
 
             if inEpisode {
-                let endIdx = min(lastEnd, moods.count - 1)
+                let endIdx = min(lastEnd, dayMoods.count - 1)
                 var moodAcc = 0.0, flavourAcc = 0.0, cnt = 0
                 for j in episodeStart...endIdx {
-                    if let m = moods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
+                    if let m = dayMoods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
                 }
                 result.append(Episode(
-                    startIndex: episodeStart,
-                    endIndex: endIdx,
+                    startDate: allDays[episodeStart],
+                    endDate: allDays[endIdx],
                     type: below ? .depressive : .elevated,
                     averageMood: cnt > 0 ? moodAcc / Double(cnt) : threshold,
                     averageFlavour: cnt > 0 ? flavourAcc / Double(cnt) : 0.5
@@ -581,24 +592,22 @@ struct MoodDiagramView: View {
             return result
         }
 
+        var episodes: [Episode] = []
         episodes.append(contentsOf: scan(threshold: 35, below: true))
         episodes.append(contentsOf: scan(threshold: 65, below: false))
 
-        // Merge nearby episodes of the same type (gap <= 3 days)
         var merged: [Episode] = []
-        let sorted = episodes.sorted { $0.startIndex < $1.startIndex }
+        let sorted = episodes.sorted { $0.startDate < $1.startDate }
         for ep in sorted {
             if let last = merged.last,
                last.type == ep.type,
-               ep.startIndex - last.endIndex <= 3 {
+               let gap = calendar.dateComponents([.day], from: last.endDate, to: ep.startDate).day,
+               gap <= 3 {
                 var combined = merged.removeLast()
-                combined.endIndex = ep.endIndex
-                var moodAcc = 0.0, flavourAcc = 0.0, cnt = 0
-                for j in combined.startIndex...combined.endIndex {
-                    if let m = moods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
-                }
-                combined.averageMood = cnt > 0 ? moodAcc / Double(cnt) : combined.averageMood
-                combined.averageFlavour = cnt > 0 ? flavourAcc / Double(cnt) : combined.averageFlavour
+                combined.endDate = ep.endDate
+                let totalCount = 2.0
+                combined.averageMood = (last.averageMood + ep.averageMood) / totalCount
+                combined.averageFlavour = (last.averageFlavour + ep.averageFlavour) / totalCount
                 merged.append(combined)
             } else {
                 merged.append(ep)
@@ -607,16 +616,34 @@ struct MoodDiagramView: View {
         return merged
     }
 
-    private func drawEpisodes(_ episodes: [Episode], days: [Date], in context: GraphicsContext, size: CGSize) {
+    private func episodesForPage(_ days: [Date]) -> [(startIndex: Int, endIndex: Int, episode: Episode)] {
+        guard let pageStart = days.first, let pageEnd = days.last else { return [] }
+        var result: [(startIndex: Int, endIndex: Int, episode: Episode)] = []
+
+        for ep in globalEpisodes {
+            if ep.endDate < pageStart || ep.startDate > pageEnd { continue }
+
+            let clippedStart = max(ep.startDate, pageStart)
+            let clippedEnd = min(ep.endDate, pageEnd)
+
+            let startIdx = max(0, calendar.dateComponents([.day], from: pageStart, to: clippedStart).day ?? 0)
+            let endIdx = min(days.count - 1, calendar.dateComponents([.day], from: pageStart, to: clippedEnd).day ?? 0)
+
+            result.append((startIndex: startIdx, endIndex: endIdx, episode: ep))
+        }
+        return result
+    }
+
+    private func drawEpisodes(_ pageEpisodes: [(startIndex: Int, endIndex: Int, episode: Episode)], in context: GraphicsContext, size: CGSize) {
         let totalDays = scale.dayCount
         let fadeWidth: CGFloat = 12
 
-        for episode in episodes {
-            let left = x(forDayIndex: episode.startIndex, totalDays: totalDays, width: size.width) - 4
-            let right = x(forDayIndex: episode.endIndex, totalDays: totalDays, width: size.width) + 4
+        for item in pageEpisodes {
+            let left = x(forDayIndex: item.startIndex, totalDays: totalDays, width: size.width) - 4
+            let right = x(forDayIndex: item.endIndex, totalDays: totalDays, width: size.width) + 4
             let rect = CGRect(x: left, y: 0, width: right - left, height: size.height)
 
-            let baseColor = MoodColor.color(mood: episode.averageMood, flavour: episode.averageFlavour)
+            let baseColor = MoodColor.color(mood: item.episode.averageMood, flavour: item.episode.averageFlavour)
             let bandColor = baseColor.opacity(0.12)
 
             context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(bandColor))

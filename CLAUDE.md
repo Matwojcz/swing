@@ -32,28 +32,28 @@ language reference but is not the active UI.
 
 ## Completed features
 
-1. **Logging** — save a mood entry (energy, flavour, optional note,
-   timestamp) to the local database.
-2. **History view** — scrollable, mood-colored entry list with fade masks
-   at top and bottom edges.
-3. **Weekly diagram** — energy over time, per-day averaged, line colored
-   via the same MoodColor stops so it visually echoes the gauge.
+1. **Logging** — save a mood entry (energy, flavour, optional title,
+   note, timestamp) to the local database.
+2. **History view** — scrollable, mood-colored entry list with fade mask.
+3. **Diagram** — energy over time with mood-colored line; supports
+   week/month/year scales with pinch-to-zoom and paging.
+4. **Entry detail panel** — tap a history entry to open an overlay
+   showing full note/title with inline editing, delete, and mood data.
+5. **Markdown import** — import .md diary files with preview sheet;
+   parses dates, mood/flavour from fields or text sentiment.
+6. **Notes** — title and free-text note fields on entries (diary
+   function minus search).
 
 ## Planned features (roughly in build order)
 
-4. **Delete-all confirmation** — show a warning/confirmation dialog
+7. **Delete-all confirmation** — show a warning/confirmation dialog
    before deleting all entries.
-5. **One entry per day** — block the logger from adding a second entry
+8. **One entry per day** — block the logger from adding a second entry
    when one already exists for that calendar day.
-6. **Retrospective entries** — tap a date in the weekly diagram to open
+9. **Retrospective entries** — tap a date in the weekly diagram to open
    the logger pre-filled with that date, allowing past-day entries.
-7. **Entry detail panel** — tap a history entry to open a side panel
-   showing the full note and entry data.
-8. **Diary function** — richer free-text notes attached to entries,
-   searchable.
-9. **Markdown import** — import existing diary files (.md) to extract
-   and backfill entries with dates.
-10. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
+10. **Note search** — search/filter entries by note and title text.
+11. (Maybe) trends/insights — but keep this descriptive, not diagnostic.
     Never present pattern detection as a clinical claim.
 
 ## Tone and framing rules

@@ -2,13 +2,13 @@
 MCP server for Swing — lets Claude read and write mood entries
 directly in the app's SQLite database.
 
-Add to your Claude config (claude_desktop_config.json or .claude.json):
+Add to your Claude config (claude_desktop_config.json or .mcp.json):
 
 {
   "mcpServers": {
-    "mood-battery": {
+    "swing": {
       "command": "python3",
-      "args": ["/Users/matwojcz/Dev/mood-battery/mcp-server/mood_battery_server.py"]
+      "args": ["<path-to-repo>/mcp-server/mood_battery_server.py"]
     }
   }
 }
@@ -28,7 +28,7 @@ DB_PATH = os.path.expanduser(
 )
 
 mcp = FastMCP(
-    "mood-battery",
+    "swing",
     instructions=(
         "Swing is a bipolar mood tracker. Mood ranges 0–100 "
         "(0 = deep depressive, 50 = baseline, 100 = peak hype). "

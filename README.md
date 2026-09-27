@@ -66,6 +66,24 @@ open MoodBattery.xcodeproj
 Build and run from Xcode (Cmd+R). The app stores data in a local SQLite
 database — no account or network connection needed.
 
+## MCP server (optional)
+
+The included MCP server lets Claude read and write mood entries directly.
+Requires Python 3 and the `mcp` package (`pip install mcp`).
+
+Add to your Claude config (`.mcp.json` or `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "swing": {
+      "command": "python3",
+      "args": ["<path-to-repo>/mcp-server/mood_battery_server.py"]
+    }
+  }
+}
+```
+
 ## Tech stack
 
 - **SwiftUI** — native macOS interface

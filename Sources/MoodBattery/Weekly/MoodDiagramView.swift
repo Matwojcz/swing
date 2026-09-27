@@ -583,7 +583,28 @@ struct MoodDiagramView: View {
 
         episodes.append(contentsOf: scan(threshold: 35, below: true))
         episodes.append(contentsOf: scan(threshold: 65, below: false))
-        return episodes
+
+        // Merge nearby episodes of the same type (gap <= 3 days)
+        var merged: [Episode] = []
+        let sorted = episodes.sorted { $0.startIndex < $1.startIndex }
+        for ep in sorted {
+            if let last = merged.last,
+               last.type == ep.type,
+               ep.startIndex - last.endIndex <= 3 {
+                var combined = merged.removeLast()
+                combined.endIndex = ep.endIndex
+                var moodAcc = 0.0, flavourAcc = 0.0, cnt = 0
+                for j in combined.startIndex...combined.endIndex {
+                    if let m = moods[j] { moodAcc += m.mood; flavourAcc += m.flavour; cnt += 1 }
+                }
+                combined.averageMood = cnt > 0 ? moodAcc / Double(cnt) : combined.averageMood
+                combined.averageFlavour = cnt > 0 ? flavourAcc / Double(cnt) : combined.averageFlavour
+                merged.append(combined)
+            } else {
+                merged.append(ep)
+            }
+        }
+        return merged
     }
 
     private func drawEpisodes(_ episodes: [Episode], days: [Date], in context: GraphicsContext, size: CGSize) {

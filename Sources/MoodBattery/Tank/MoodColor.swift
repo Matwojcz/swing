@@ -13,11 +13,13 @@ enum MoodColor {
     ]
     private static let happyHighStops: [Stop] = [
         (50, (55, 138, 221)),
+        (62, (72, 178, 120)),
         (75, (239, 159, 39)),
         (100, (216, 90, 48)),
     ]
     private static let irritableHighStops: [Stop] = [
         (50, (55, 138, 221)),
+        (62, (88, 160, 110)),
         (75, (226, 75, 74)),
         (100, (153, 53, 86)),
     ]

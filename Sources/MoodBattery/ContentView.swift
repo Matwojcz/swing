@@ -177,11 +177,12 @@ struct ContentView: View {
         let today = cal.startOfDay(for: Date())
         var rng = SystemRandomNumberGenerator()
 
-        var mood = 50.0
+        var mood = MoodScale.baseline
         for dayOffset in (0..<180).reversed() {
             let date = cal.date(byAdding: .day, value: -dayOffset, to: today)!
-            let drift = Double.random(in: -12...12, using: &rng)
-            mood = max(5, min(95, mood + drift))
+            let drift = Double.random(in: -1.2...1.2, using: &rng)
+            mood = max(0.5, min(9.5, mood + drift))
+            mood = (mood / MoodScale.step).rounded() * MoodScale.step
             let flavour = Double.random(in: 0...1, using: &rng)
 
             let titles = ["solid day", "rough morning", "high energy", "calm afternoon",

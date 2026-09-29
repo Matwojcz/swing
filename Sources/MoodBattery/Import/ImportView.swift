@@ -87,7 +87,7 @@ struct ImportPreviewSheet: View {
 
                 Spacer()
 
-                Text("\(Int(entry.mood))")
+                Text(MoodScale.format(entry.mood))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -112,10 +112,10 @@ struct ImportPreviewSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(Int(entries[index].mood))")
+                        Text(MoodScale.format(entries[index].mood))
                             .font(.system(size: 13, weight: .semibold))
                     }
-                    Slider(value: $entries[index].mood, in: 0...100, step: 1)
+                    Slider(value: $entries[index].mood, in: MoodScale.range, step: MoodScale.step)
 
                     HStack {
                         Text("Flavour")

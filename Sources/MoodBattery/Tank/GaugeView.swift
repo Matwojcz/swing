@@ -23,7 +23,7 @@ struct GaugeView: View {
     private static let innerRadius: CGFloat = 108 * scale
     private static let outerRadius: CGFloat = 138 * scale
     private static let needleLength: CGFloat = 122 * scale
-    private static let redlineThreshold: Double = 88
+    private static let redlineThreshold: Double = MoodScale.redline
     /// Top of the dashed baseline tick, measured from this view's own top
     /// edge — exposed so sibling layout (the flavour slider) can align to it.
     static let baselineTopY: CGFloat = cy - (outerRadius + 18 * scale)
@@ -80,7 +80,7 @@ struct GaugeView: View {
     // MARK: - Geometry
 
     private func angleDegrees(for value: Double) -> Double {
-        180 - (value / 100) * 180
+        180 - MoodScale.normalized(value) * 180
     }
 
     private func point(for value: Double, radius: CGFloat) -> CGPoint {
@@ -93,7 +93,7 @@ struct GaugeView: View {
     private func drawBand(in context: GraphicsContext) {
         let ticks = 100
         for i in 0...ticks {
-            let v = Double(i) / Double(ticks) * 100
+            let v = Double(i) / Double(ticks) * MoodScale.max
             var path = Path()
             path.move(to: point(for: v, radius: innerRadius))
             path.addLine(to: point(for: v, radius: outerRadius))
@@ -103,8 +103,8 @@ struct GaugeView: View {
 
     private func drawBaselineTick(in context: GraphicsContext) {
         var path = Path()
-        path.move(to: point(for: 50, radius: innerRadius - 14))
-        path.addLine(to: point(for: 50, radius: outerRadius + 18))
+        path.move(to: point(for: MoodScale.baseline, radius: innerRadius - 14))
+        path.addLine(to: point(for: MoodScale.baseline, radius: outerRadius + 18))
         context.stroke(
             path,
             with: .color(.white.opacity(0.9)),
@@ -115,7 +115,7 @@ struct GaugeView: View {
     private func drawRedlineTicks(in context: GraphicsContext) {
         let steps = 24
         for i in 0...steps {
-            let v = redlineThreshold + Double(i) / Double(steps) * 12
+            let v = redlineThreshold + Double(i) / Double(steps) * (MoodScale.max - redlineThreshold)
             var path = Path()
             path.move(to: point(for: v, radius: outerRadius + 5))
             path.addLine(to: point(for: v, radius: outerRadius + 15))
@@ -152,16 +152,18 @@ struct GaugeView: View {
                 if angleDeg < 0 {
                     angleDeg = dx >= 0 ? 0 : 180
                 }
-                onMoodChange(((180 - angleDeg) / 180 * 100).rounded())
+                let raw = (180 - angleDeg) / 180 * MoodScale.max
+                let snapped = (raw / MoodScale.step).rounded() * MoodScale.step
+                onMoodChange(snapped)
             }
     }
 }
 
 #Preview {
     VStack(spacing: 20) {
-        GaugeView(mood: 20, flavour: 0.5)
-        GaugeView(mood: 50, flavour: 0.5)
-        GaugeView(mood: 92, flavour: 0.1)
+        GaugeView(mood: 2, flavour: 0.5)
+        GaugeView(mood: 5, flavour: 0.5)
+        GaugeView(mood: 9.2, flavour: 0.1)
     }
     .padding(40)
 }

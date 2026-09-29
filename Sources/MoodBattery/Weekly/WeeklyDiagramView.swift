@@ -73,7 +73,7 @@ struct WeeklyDiagramView: View {
 
     private func y(for mood: Double, size: CGSize) -> CGFloat {
         let usable = size.height - verticalPadding * 2
-        return verticalPadding + CGFloat(1 - mood / 100) * usable
+        return verticalPadding + CGFloat(1 - MoodScale.normalized(mood)) * usable
     }
 
     private func point(for average: (dayIndex: Int, mood: Double, flavour: Double), size: CGSize) -> CGPoint {
@@ -83,7 +83,7 @@ struct WeeklyDiagramView: View {
     // MARK: - Drawing
 
     private func drawBaseline(in context: GraphicsContext, size: CGSize) {
-        let baselineY = y(for: 50, size: size)
+        let baselineY = y(for: MoodScale.baseline, size: size)
         var path = Path()
         path.move(to: CGPoint(x: 0, y: baselineY))
         path.addLine(to: CGPoint(x: size.width, y: baselineY))

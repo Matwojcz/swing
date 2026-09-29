@@ -7,10 +7,10 @@ hype, baseline) rather than euphemisms.
 ## How it works
 
 A semicircular gauge is the main interaction. Drag the needle to set your
-energy level (0-100):
+energy level (0-10, half-point steps):
 
 - The arc sweeps from black (depressive floor) through purple, up to blue
-  at baseline (50), then into gold/orange or red/magenta above baseline.
+  at baseline (5), then through green into gold/orange or red/magenta above.
 - A vertical flavour slider sets the tone of elevated mood: calm on one
   end, irritable on the other.
 - Past ~88, a redline zone with spark particles marks the hype range —
@@ -22,7 +22,7 @@ your mood over time across week, month, and year scales.
 
 ## Features
 
-- **Gauge logging** — drag to set mood (0-100), slide to set flavour
+- **Gauge logging** — drag to set mood (0-10), slide to set flavour
   (calm to irritable), add a title and note, save to local database.
 - **History list** — scrollable, mood-colored entries with Dock-style
   magnification on hover and liquid glass effects (macOS 26+).

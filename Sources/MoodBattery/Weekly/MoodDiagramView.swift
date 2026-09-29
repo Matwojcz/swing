@@ -151,7 +151,7 @@ struct MoodDiagramView: View {
                         ForEach(0..<scale.dayCount, id: \.self) { dayIdx in
                             if !tappableSet.contains(dayIdx) {
                                 let px = x(forDayIndex: dayIdx, totalDays: scale.dayCount, width: geo.size.width)
-                                let baselineY = y(for: 50, height: geo.size.height)
+                                let baselineY = y(for: MoodScale.baseline, height: geo.size.height)
                                 Color.clear
                                     .frame(width: 28, height: 28)
                                     .contentShape(Rectangle())
@@ -480,13 +480,13 @@ struct MoodDiagramView: View {
 
     private func y(for mood: Double, height: CGFloat) -> CGFloat {
         let usable = height - verticalPadding * 2
-        return verticalPadding + CGFloat(1 - mood / 100) * usable
+        return verticalPadding + CGFloat(1 - MoodScale.normalized(mood)) * usable
     }
 
     // MARK: - Drawing
 
     private func drawBaseline(in context: GraphicsContext, size: CGSize) {
-        let baselineY = y(for: 50, height: size.height)
+        let baselineY = y(for: MoodScale.baseline, height: size.height)
         var path = Path()
         path.move(to: CGPoint(x: 0, y: baselineY))
         path.addLine(to: CGPoint(x: size.width, y: baselineY))
@@ -593,8 +593,8 @@ struct MoodDiagramView: View {
         }
 
         var episodes: [Episode] = []
-        episodes.append(contentsOf: scan(threshold: 35, below: true))
-        episodes.append(contentsOf: scan(threshold: 65, below: false))
+        episodes.append(contentsOf: scan(threshold: MoodScale.episodeDepressiveThreshold, below: true))
+        episodes.append(contentsOf: scan(threshold: MoodScale.episodeElevatedThreshold, below: false))
 
         var merged: [Episode] = []
         let sorted = episodes.sorted { $0.startDate < $1.startDate }
@@ -731,7 +731,7 @@ struct MoodDiagramView: View {
     let sample: [MoodEntry] = (0..<60).map { i in
         MoodEntry(
             id: Int64(i),
-            mood: Double.random(in: 10...95),
+            mood: Double.random(in: 1...9.5),
             flavour: Double.random(in: 0...1),
             title: nil,
             note: nil,

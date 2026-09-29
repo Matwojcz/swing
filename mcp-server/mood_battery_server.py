@@ -30,8 +30,8 @@ DB_PATH = os.path.expanduser(
 mcp = FastMCP(
     "swing",
     instructions=(
-        "Swing is a bipolar mood tracker. Mood ranges 0–100 "
-        "(0 = deep depressive, 50 = baseline, 100 = peak hype). "
+        "Swing is a bipolar mood tracker. Mood ranges 0–10 in 0.5 steps "
+        "(0 = deep depressive, 5 = baseline, 10 = peak hype). "
         "Flavour ranges 0.0–1.0 (0 = calm, 0.5 = normal, 1 = irritable; "
         "only meaningful above baseline). "
         "Titles are short mood summaries (2–4 words). "
@@ -61,7 +61,7 @@ def row_to_dict(row: sqlite3.Row) -> dict:
 
 def format_entry(entry: dict) -> str:
     parts = [f"[{entry['id']}] {entry['timestamp']}"]
-    parts.append(f"  Mood: {entry['mood']:.0f}, Flavour: {entry['flavour']:.2f}")
+    parts.append(f"  Mood: {entry['mood']:.1f}, Flavour: {entry['flavour']:.2f}")
     if entry["title"]:
         parts.append(f"  Title: {entry['title']}")
     if entry["note"]:
@@ -83,14 +83,14 @@ def save_mood_entry(
     """Save a new mood entry.
 
     Args:
-        mood: Mood level 0–100 (0=depressive floor, 50=baseline, 100=peak hype)
-        flavour: Mood flavour 0.0–1.0 (0=happy/euphoric, 1=irritable/agitated; matters above 50 energy)
+        mood: Mood level 0–10 in 0.5 steps (0=depressive floor, 5=baseline, 10=peak hype)
+        flavour: Mood flavour 0.0–1.0 (0=happy/euphoric, 1=irritable/agitated; matters above baseline)
         title: Short mood summary, 2–4 words (e.g. "rough morning", "elevated")
         note: Longer diary text
         timestamp: ISO 8601 timestamp; defaults to now
     """
-    if not 0 <= mood <= 100:
-        return "Error: mood must be 0–100"
+    if not 0 <= mood <= 10:
+        return "Error: mood must be 0–10"
     if not 0 <= flavour <= 1:
         return "Error: flavour must be 0.0–1.0"
 
@@ -107,7 +107,7 @@ def save_mood_entry(
     db.commit()
     entry_id = cursor.lastrowid
     db.close()
-    return f"Saved entry #{entry_id} — mood {mood:.0f}, flavour {flavour:.2f}, title: {title or '(none)'}"
+    return f"Saved entry #{entry_id} — mood {mood:.1f}, flavour {flavour:.2f}, title: {title or '(none)'}"
 
 
 @mcp.tool()
@@ -123,7 +123,7 @@ def update_mood_entry(
 
     Args:
         entry_id: The entry's ID
-        mood: New mood level 0–100
+        mood: New mood level 0–10
         flavour: New flavour 0.0–1.0
         title: New title
         note: New note text
@@ -137,9 +137,9 @@ def update_mood_entry(
 
     updates = {}
     if mood is not None:
-        if not 0 <= mood <= 100:
+        if not 0 <= mood <= 10:
             db.close()
-            return "Error: mood must be 0–100"
+            return "Error: mood must be 0–10"
         updates["mood"] = mood
     if flavour is not None:
         if not 0 <= flavour <= 1:
@@ -205,7 +205,7 @@ def get_entry(entry_id: int) -> str:
     entry = row_to_dict(row)
     parts = [f"Entry #{entry['id']}"]
     parts.append(f"Timestamp: {entry['timestamp']}")
-    parts.append(f"Mood: {entry['mood']:.0f}")
+    parts.append(f"Mood: {entry['mood']:.1f}")
     parts.append(f"Flavour: {entry['flavour']:.2f}")
     parts.append(f"Title: {entry['title'] or '(none)'}")
     parts.append(f"Note: {entry['note'] or '(none)'}")
@@ -298,7 +298,7 @@ def mood_summary(days: int = 7) -> str:
 
     return (
         f"Last {days} days: {len(rows)} entries\n"
-        f"Mood — avg: {avg_mood:.0f}, min: {min(moods):.0f}, max: {max(moods):.0f}\n"
+        f"Mood — avg: {avg_mood:.1f}, min: {min(moods):.1f}, max: {max(moods):.1f}\n"
         f"Flavour — avg: {avg_flavour:.2f}\n"
         f"Range: {rows[0]['timestamp']} → {rows[-1]['timestamp']}"
     )

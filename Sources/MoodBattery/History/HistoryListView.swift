@@ -140,7 +140,7 @@ private struct RowMidYKey: PreferenceKey {
 
 #Preview {
     HistoryListView(entries: (0..<10).map {
-        MoodEntry(id: Int64($0), mood: Double.random(in: 0...100), flavour: 0.4, note: nil, timestamp: Date())
+        MoodEntry(id: Int64($0), mood: Double.random(in: MoodScale.range), flavour: 0.4, note: nil, timestamp: Date())
     })
     .frame(width: 240, height: 320)
 }

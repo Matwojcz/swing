@@ -8,7 +8,7 @@ extension VerticalAlignment {
 }
 
 struct MoodEntryEditor: View {
-    @State private var mood: Double = 50
+    @State private var mood: Double = MoodScale.baseline
     @State private var flavour: Double = 0
     @State private var title: String = ""
     @State private var note: String = ""
@@ -79,7 +79,7 @@ struct MoodEntryEditor: View {
             Text(MoodState.label(mood: mood, flavour: flavour))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("\(Int(mood))")
+            Text(MoodScale.format(mood))
                 .font(.system(size: 28, weight: .medium))
         }
     }
@@ -103,7 +103,7 @@ struct MoodEntryEditor: View {
                 .frame(width: trackWidth, height: length)
 
             Circle()
-                .fill(MoodColor.color(mood: max(mood, 51), flavour: flavour))
+                .fill(MoodColor.color(mood: max(mood, MoodScale.baseline + 0.1), flavour: flavour))
                 .overlay(Circle().stroke(Color.tankBorder, lineWidth: 1.5))
                 .frame(width: thumbSize, height: thumbSize)
                 .offset(y: flavour * (length - thumbSize))

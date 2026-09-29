@@ -63,7 +63,7 @@ struct MarkdownImporter {
             for line in currentBody {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 if let val = parseField(trimmed, name: "mood") ?? parseField(trimmed, name: "energy") {
-                    explicitMood = max(0, min(100, val))
+                    explicitMood = max(MoodScale.min, min(MoodScale.max, val))
                 } else if let val = parseField(trimmed, name: "flavour") ?? parseField(trimmed, name: "flavor") {
                     explicitFlavour = max(0, min(1, val))
                 } else {
@@ -211,42 +211,42 @@ struct MarkdownImporter {
 
     private func estimateMood(from text: String) -> Double {
         let lower = text.lowercased()
-        var score: Double = 50
+        var score = MoodScale.baseline
 
         let depressiveSignals: [(String, Double)] = [
-            ("depressive", -18), ("depressed", -18), ("hopeless", -15),
-            ("crying", -10), ("cried", -10), ("teary", -8), ("tears", -8),
-            ("exhausted", -12), ("exhaustion", -12), ("jelly legs", -14),
-            ("couldn't do anything", -15), ("unable to", -10),
-            ("no energy", -15), ("low energy", -12), ("so tired", -12),
-            ("anhedonia", -16), ("felt nothing", -14), ("joyless", -14),
-            ("isolation", -10), ("isolated", -10), ("withdrew", -10),
-            ("worthless", -16), ("debilitated", -16), ("flat", -10),
-            ("sad", -8), ("sadness", -8), ("drained", -10),
-            ("anxiety attack", -12), ("panic attack", -14),
-            ("self-harm", -18), ("suicid", -20), ("ending my life", -20),
-            ("slug mode", -12), ("not giving a shit", -8),
-            ("heavy comedown", -12), ("fragile", -8),
+            ("depressive", -1.8), ("depressed", -1.8), ("hopeless", -1.5),
+            ("crying", -1.0), ("cried", -1.0), ("teary", -0.8), ("tears", -0.8),
+            ("exhausted", -1.2), ("exhaustion", -1.2), ("jelly legs", -1.4),
+            ("couldn't do anything", -1.5), ("unable to", -1.0),
+            ("no energy", -1.5), ("low energy", -1.2), ("so tired", -1.2),
+            ("anhedonia", -1.6), ("felt nothing", -1.4), ("joyless", -1.4),
+            ("isolation", -1.0), ("isolated", -1.0), ("withdrew", -1.0),
+            ("worthless", -1.6), ("debilitated", -1.6), ("flat", -1.0),
+            ("sad", -0.8), ("sadness", -0.8), ("drained", -1.0),
+            ("anxiety attack", -1.2), ("panic attack", -1.4),
+            ("self-harm", -1.8), ("suicid", -2.0), ("ending my life", -2.0),
+            ("slug mode", -1.2), ("not giving a shit", -0.8),
+            ("heavy comedown", -1.2), ("fragile", -0.8),
         ]
 
         let elevatedSignals: [(String, Double)] = [
-            ("wired", 15), ("racing thoughts", 14), ("hyper", 14),
-            ("euphori", 14), ("god mode", 18), ("unstoppable", 16),
-            ("high energy", 14), ("manic", 16), ("elevated", 12),
-            ("couldn't sleep", 10), ("can't sleep", 10),
-            ("sharp", 8), ("fast and wired", 16),
-            ("razor sharp", 14), ("electric sensation", 12),
-            ("tingling", 10), ("sweaty hands", 8),
-            ("talking too fast", 12), ("too loud", 10),
-            ("impulsive", 10), ("obsess", 10), ("preoccup", 10),
-            ("high day", 14), ("up-day", 14),
+            ("wired", 1.5), ("racing thoughts", 1.4), ("hyper", 1.4),
+            ("euphori", 1.4), ("god mode", 1.8), ("unstoppable", 1.6),
+            ("high energy", 1.4), ("manic", 1.6), ("elevated", 1.2),
+            ("couldn't sleep", 1.0), ("can't sleep", 1.0),
+            ("sharp", 0.8), ("fast and wired", 1.6),
+            ("razor sharp", 1.4), ("electric sensation", 1.2),
+            ("tingling", 1.0), ("sweaty hands", 0.8),
+            ("talking too fast", 1.2), ("too loud", 1.0),
+            ("impulsive", 1.0), ("obsess", 1.0), ("preoccup", 1.0),
+            ("high day", 1.4), ("up-day", 1.4),
         ]
 
         let baselineSignals: [(String, Double)] = [
-            ("baseline", 0), ("settled", -2), ("normal", -1),
-            ("quiet day", -3), ("uneventful", -3), ("solid day", -1),
-            ("properly normal", -2), ("content", 2), ("rested", 1),
-            ("productive", 3), ("good day", 3), ("lovely", 2),
+            ("baseline", 0), ("settled", -0.2), ("normal", -0.1),
+            ("quiet day", -0.3), ("uneventful", -0.3), ("solid day", -0.1),
+            ("properly normal", -0.2), ("content", 0.2), ("rested", 0.1),
+            ("productive", 0.3), ("good day", 0.3), ("lovely", 0.2),
         ]
 
         for (word, delta) in depressiveSignals where lower.contains(word) {
@@ -259,7 +259,7 @@ struct MarkdownImporter {
             score += delta
         }
 
-        return max(0, min(100, score))
+        return max(MoodScale.min, min(MoodScale.max, score))
     }
 
     // MARK: - Flavour estimation

@@ -156,11 +156,11 @@ struct EntryDetailPanel: View {
             .padding(.vertical, 2)
             .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.tankSurface))
         } else {
-            Text("Mood \(Int(entry.mood))")
+            Text("Mood \(MoodScale.format(entry.mood))")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .onTapGesture(count: 2) {
-                    draftMood = "\(Int(entry.mood))"
+                    draftMood = MoodScale.format(entry.mood)
                     editingField = .mood
                 }
         }
@@ -278,7 +278,7 @@ struct EntryDetailPanel: View {
 
     private func commitMood() {
         guard let newMood = Double(draftMood),
-              (0...100).contains(newMood) else { editingField = nil; return }
+              MoodScale.range.contains(newMood) else { editingField = nil; return }
         var updated = entry
         updated.mood = newMood
         onUpdate?(updated)

@@ -63,6 +63,10 @@ final class DatabaseManager {
             try db.drop(table: "moodEntry_old")
         }
 
+        migrator.registerMigration("scaleMood0to10") { db in
+            try db.execute(sql: "UPDATE moodEntry SET mood = mood / 10.0")
+        }
+
         return migrator
     }
 }

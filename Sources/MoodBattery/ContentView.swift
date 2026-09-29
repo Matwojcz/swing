@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @State private var entries: [MoodEntry] = []
     @State private var selectedEntry: MoodEntry?
+    @State private var isDetailPanelShown = false
     @State private var scrollToEntry: MoodEntry?
     @State private var showImporter = false
     @State private var pendingImportEntries: [EditableImportEntry] = []
@@ -12,6 +13,7 @@ struct ContentView: View {
     @State private var showClearConfirmation = false
     @State private var retroDate: Date?
     @State private var diagramScrollDate: Date?
+    @FocusState private var mainFocused: Bool
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
@@ -23,42 +25,43 @@ struct ContentView: View {
                     MoodEntryEditor(targetDate: retroDate, onSave: {
                         retroDate = nil
                         reload()
-                    })
+                    }, previewEntry: selectedEntry)
                     MoodDiagramView(entries: entries, onSelectDate: { date in
                         let cal = Calendar.current
                         if let entry = entries.first(where: { cal.isDate($0.timestamp, inSameDayAs: date) }) {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selectedEntry = entry
+                                isDetailPanelShown = true
                                 scrollToEntry = entry
                                 diagramScrollDate = entry.timestamp
                             }
                         } else {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 retroDate = date
+                                selectedEntry = nil
+                                isDetailPanelShown = false
                             }
                         }
                     }, scrollToDate: diagramScrollDate)
                     .padding(.horizontal, 16)
                 }
 
-                if let entry = selectedEntry {
+                if let entry = selectedEntry, isDetailPanelShown {
                     Color.black.opacity(0.15)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedEntry = nil
-                            }
+                            closeDetailPanel()
                         }
 
                     EntryDetailPanel(entry: entry, onClose: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedEntry = nil
-                        }
+                        closeDetailPanel()
                     }, onDelete: {
                         try? store.delete(entry)
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedEntry = nil
+                            isDetailPanelShown = false
                         }
+                        mainFocused = true
                         reload()
                     }, onUpdate: { updated in
                         try? store.save(updated)
@@ -80,6 +83,7 @@ struct ContentView: View {
                 onSelect: { entry in
                     withAnimation(.easeInOut(duration: 0.25)) {
                         selectedEntry = entry
+                        isDetailPanelShown = true
                         diagramScrollDate = entry.timestamp
                     }
                 },
@@ -87,6 +91,7 @@ struct ContentView: View {
                     try? store.delete(entry)
                     if selectedEntry?.id == entry.id {
                         selectedEntry = nil
+                        isDetailPanelShown = false
                     }
                     reload()
                 },
@@ -97,7 +102,43 @@ struct ContentView: View {
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 20)
-        .onAppear(perform: reload)
+        .focusable()
+        .focused($mainFocused)
+        .focusEffectDisabled()
+        .onKeyPress(.upArrow) {
+            guard !isDetailPanelShown else { return .ignored }
+            navigateEntry(direction: -1)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            guard !isDetailPanelShown else { return .ignored }
+            navigateEntry(direction: 1)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard !isDetailPanelShown, selectedEntry != nil else { return .ignored }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isDetailPanelShown = true
+            }
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            if isDetailPanelShown {
+                closeDetailPanel()
+                return .handled
+            }
+            if selectedEntry != nil {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedEntry = nil
+                }
+                return .handled
+            }
+            return .ignored
+        }
+        .onAppear {
+            reload()
+            mainFocused = true
+        }
         .toolbar {
             ToolbarItem {
                 Button(action: { showImporter = true }) {
@@ -202,18 +243,31 @@ struct ContentView: View {
         reload()
     }
 
-    /// Moves the detail panel selection to the previous (-1) or next (+1) entry in the list.
+    /// Moves the selection to the previous (-1) or next (+1) entry in the list; selects the first entry if none is selected yet.
     private func navigateEntry(direction: Int) {
-        guard let current = selectedEntry,
-              let idx = entries.firstIndex(where: { $0.id == current.id }) else { return }
-        let newIdx = idx + direction
-        guard entries.indices.contains(newIdx) else { return }
-        let next = entries[newIdx]
+        guard !entries.isEmpty else { return }
+        let next: MoodEntry
+        if let current = selectedEntry,
+           let idx = entries.firstIndex(where: { $0.id == current.id }) {
+            let newIdx = idx + direction
+            guard entries.indices.contains(newIdx) else { return }
+            next = entries[newIdx]
+        } else {
+            next = entries[0]
+        }
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedEntry = next
             scrollToEntry = next
             diagramScrollDate = next.timestamp
         }
+    }
+
+    /// Closes the detail panel while keeping the entry highlighted so the gauge continues to show its values, and returns focus to the main view.
+    private func closeDetailPanel() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isDetailPanelShown = false
+        }
+        mainFocused = true
     }
 
     /// Wipes all mood entries from the database and refreshes the view.

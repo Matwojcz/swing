@@ -16,11 +16,20 @@ struct MoodEntryEditor: View {
 
     var targetDate: Date?
     var onSave: (() -> Void)?
+    /// When set, the gauge and flavour track display this entry's values in read-only mode instead of the editor draft.
+    var previewEntry: MoodEntry?
 
     private let store = MoodEntryStore()
 
     private let headerHeight: CGFloat = 56
     private let headerGaugeSpacing: CGFloat = 8
+
+    /// Whether the editor is currently showing a read-only preview of an existing entry.
+    private var isPreviewing: Bool { previewEntry != nil }
+    /// The mood value to display on the gauge — the preview entry's value when previewing, otherwise the editor draft.
+    private var displayMood: Double { previewEntry?.mood ?? mood }
+    /// The flavour value to display — the preview entry's value when previewing, otherwise the editor draft.
+    private var displayFlavour: Double { previewEntry?.flavour ?? flavour }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -28,7 +37,8 @@ struct MoodEntryEditor: View {
                 VStack(spacing: headerGaugeSpacing) {
                     header
                         .frame(height: headerHeight)
-                    GaugeView(mood: mood, flavour: flavour, onMoodChange: { mood = $0 })
+                    GaugeView(mood: displayMood, flavour: displayFlavour,
+                              onMoodChange: isPreviewing ? nil : { mood = $0 })
                 }
                 .alignmentGuide(.gaugeBaselineTop) { _ in
                     headerHeight + headerGaugeSpacing + GaugeView.baselineTopY
@@ -47,28 +57,30 @@ struct MoodEntryEditor: View {
                 }
             }
 
-            TextField("Title", text: $title)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, weight: .semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .modifier(GlassFieldModifier())
+            if !isPreviewing {
+                TextField("Title", text: $title)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .modifier(GlassFieldModifier())
 
-            GrowingTextEditor(text: $note, placeholder: "Note")
+                GrowingTextEditor(text: $note, placeholder: "Note")
 
-            if let targetDate {
-                Text("Logging for \(Self.dateLabel.string(from: targetDate))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                if let targetDate {
+                    Text("Logging for \(Self.dateLabel.string(from: targetDate))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
-            Button("Log entry", action: save)
-                .modifier(GlassButtonModifier())
+                Button("Log entry", action: save)
+                    .modifier(GlassButtonModifier())
 
-            if let saveError {
-                Text(saveError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                if let saveError {
+                    Text(saveError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
         }
         .padding(24)
@@ -76,17 +88,18 @@ struct MoodEntryEditor: View {
 
     private var header: some View {
         VStack(spacing: 2) {
-            Text(MoodState.label(mood: mood, flavour: flavour))
+            Text(MoodState.label(mood: displayMood, flavour: displayFlavour))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text(MoodScale.format(mood))
+            Text(MoodScale.format(displayMood))
                 .font(.system(size: 28, weight: .medium))
         }
     }
 
     private var flavourLabel: String {
-        if flavour < 0.35 { return "calm" }
-        if flavour > 0.65 { return "irritable" }
+        let f = displayFlavour
+        if f < 0.35 { return "calm" }
+        if f > 0.65 { return "irritable" }
         return "normal"
     }
 
@@ -103,16 +116,17 @@ struct MoodEntryEditor: View {
                 .frame(width: trackWidth, height: length)
 
             Circle()
-                .fill(MoodColor.color(mood: max(mood, MoodScale.baseline + 0.1), flavour: flavour))
+                .fill(MoodColor.color(mood: max(displayMood, MoodScale.baseline + 0.1), flavour: displayFlavour))
                 .overlay(Circle().stroke(Color.tankBorder, lineWidth: 1.5))
                 .frame(width: thumbSize, height: thumbSize)
-                .offset(y: flavour * (length - thumbSize))
+                .offset(y: displayFlavour * (length - thumbSize))
         }
         .frame(width: thumbSize + 16, height: length)
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
+                    guard !isPreviewing else { return }
                     let clamped = max(0, min(value.location.y, length))
                     flavour = clamped / length
                 }

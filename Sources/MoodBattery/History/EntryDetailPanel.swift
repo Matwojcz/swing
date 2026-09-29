@@ -276,6 +276,7 @@ struct EntryDetailPanel: View {
 
     // MARK: - Commit
 
+    /// Parses the draft mood string, validates it's within the allowed range, and pushes the update to the parent.
     private func commitMood() {
         guard let newMood = Double(draftMood),
               MoodScale.range.contains(newMood) else { editingField = nil; return }
@@ -285,6 +286,7 @@ struct EntryDetailPanel: View {
         editingField = nil
     }
 
+    /// Parses the draft flavour from a label ("calm"/"normal"/"irritable") or numeric string and pushes the update.
     private func commitFlavour() {
         let input = draftFlavour.trimmingCharacters(in: .whitespaces).lowercased()
         var newFlavour: Double?
@@ -301,6 +303,7 @@ struct EntryDetailPanel: View {
         editingField = nil
     }
 
+    /// Saves the edited title (or nil if empty) and exits editing mode.
     private func commitTitle() {
         var updated = entry
         updated.title = draftTitle.isEmpty ? nil : draftTitle
@@ -308,6 +311,7 @@ struct EntryDetailPanel: View {
         editingField = nil
     }
 
+    /// Saves the edited note (or nil if empty) and exits editing mode.
     private func commitNote() {
         var updated = entry
         updated.note = draftNote.isEmpty ? nil : draftNote
@@ -316,6 +320,7 @@ struct EntryDetailPanel: View {
     }
 }
 
+/// Applies a glass effect panel on macOS 26+, falling back to ultra-thin material with rounded corners.
 private struct GlassPanelModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {

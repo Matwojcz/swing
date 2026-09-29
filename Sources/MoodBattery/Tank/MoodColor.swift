@@ -27,6 +27,7 @@ enum MoodColor {
     /// - Parameters:
     ///   - mood: 0...10, baseline at 5.
     ///   - flavour: 0...1, 0 = happy hype, 1 = irritable hype.
+    /// Computes the mood-mapped colour by interpolating gradient stops, blending happy and irritable palettes above baseline.
     static func color(mood: Double, flavour: Double) -> Color {
         let m = mood * 10
         let rgb: (Double, Double, Double)
@@ -44,10 +45,12 @@ enum MoodColor {
         return Color(red: rgb.0 / 255, green: rgb.1 / 255, blue: rgb.2 / 255)
     }
 
+    /// Linear interpolation between two values by factor t (0...1).
     private static func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double {
         a + (b - a) * t
     }
 
+    /// Interpolates an RGB triple from an array of colour stops at the given internal value (0-100).
     private static func interp(_ stops: [Stop], _ v: Double) -> (Double, Double, Double) {
         var lo = stops[0]
         var hi = stops[stops.count - 1]

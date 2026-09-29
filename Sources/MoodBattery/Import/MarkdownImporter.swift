@@ -25,6 +25,7 @@ struct MarkdownImporter {
 
     private let store = MoodEntryStore()
 
+    /// Reads a markdown file, parses diary entries from it, saves them to the database, and returns the count imported.
     func importFile(at url: URL) throws -> Int {
         guard let content = try? String(contentsOf: url, encoding: .utf8) else {
             throw ImportError.fileUnreadable(url.path)
@@ -46,6 +47,7 @@ struct MarkdownImporter {
 
     // MARK: - Parsing
 
+    /// Parses raw markdown text into diary entries by scanning for date headings and extracting mood/flavour fields or estimating them from text.
     func parse(_ content: String) -> [ParsedEntry] {
         let lines = content.components(separatedBy: .newlines)
         var inDiarySection = false
@@ -151,6 +153,7 @@ struct MarkdownImporter {
         options: .caseInsensitive
     )
 
+    /// Attempts to extract a date from a heading string, supporting "Weekday DD Month YYYY" and date-range formats.
     private func parseDiaryDate(from text: String) -> Date? {
         let nsText = text as NSString
         let fullRange = NSRange(location: 0, length: nsText.length)
@@ -179,6 +182,7 @@ struct MarkdownImporter {
         return nil
     }
 
+    /// Constructs a Date from day/month/year strings, defaulting to noon.
     private func buildDate(day: String, month: String, year: String) -> Date? {
         guard let dayNum = Int(day),
               let monthNum = Self.monthNames[month.lowercased()],
@@ -191,6 +195,7 @@ struct MarkdownImporter {
         return Calendar.current.date(from: components)
     }
 
+    /// Extracts the title portion from a heading by splitting on em-dash or hyphen separators.
     private func extractTitle(from heading: String) -> String {
         guard let dashRange = heading.range(of: " — ") ?? heading.range(of: " - ") else {
             return ""
@@ -200,6 +205,7 @@ struct MarkdownImporter {
 
     // MARK: - Field parsing
 
+    /// Parses a "key: value" line, returning the numeric value if the key matches the given field name.
     private func parseField(_ line: String, name: String) -> Double? {
         let lower = line.lowercased()
         guard lower.hasPrefix("\(name):") else { return nil }
@@ -209,6 +215,7 @@ struct MarkdownImporter {
 
     // MARK: - Mood estimation
 
+    /// Estimates a mood value from diary text by scanning for depressive, elevated, and baseline keyword signals.
     private func estimateMood(from text: String) -> Double {
         let lower = text.lowercased()
         var score = MoodScale.baseline
@@ -264,6 +271,7 @@ struct MarkdownImporter {
 
     // MARK: - Flavour estimation
 
+    /// Estimates flavour (0=calm, 1=irritable) by counting irritable vs happy keyword hits in the text.
     private func estimateFlavour(from text: String) -> Double {
         let lower = text.lowercased()
         var irritableSignals = 0

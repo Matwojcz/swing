@@ -43,12 +43,14 @@ mcp = FastMCP(
 
 
 def get_db() -> sqlite3.Connection:
+    """Opens a connection to the Swing SQLite database with row-factory enabled."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def row_to_dict(row: sqlite3.Row) -> dict:
+    """Converts a database row into a plain dictionary with named fields."""
     return {
         "id": row["id"],
         "mood": row["mood"],
@@ -60,6 +62,7 @@ def row_to_dict(row: sqlite3.Row) -> dict:
 
 
 def format_entry(entry: dict) -> str:
+    """Formats a mood entry dict into a multi-line string for display, truncating long notes."""
     parts = [f"[{entry['id']}] {entry['timestamp']}"]
     parts.append(f"  Mood: {entry['mood']:.1f}, Flavour: {entry['flavour']:.2f}")
     if entry["title"]:

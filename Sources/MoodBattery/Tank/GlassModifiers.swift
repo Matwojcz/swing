@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Applies liquid glass button style on macOS 26+, falling back to borderedProminent.
 struct GlassButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
@@ -12,6 +13,7 @@ struct GlassButtonModifier: ViewModifier {
     }
 }
 
+/// Wraps a text field in a glass effect on macOS 26+, falling back to a themed surface fill with a subtle border.
 struct GlassFieldModifier: ViewModifier {
     var cornerRadius: CGFloat = 8
 
@@ -33,6 +35,7 @@ struct GlassFieldModifier: ViewModifier {
     }
 }
 
+/// Gives a container view a glass background on macOS 26+, falling back to a themed surface fill.
 struct GlassContainerModifier: ViewModifier {
     var cornerRadius: CGFloat = 12
 
@@ -50,6 +53,7 @@ struct GlassContainerModifier: ViewModifier {
     }
 }
 
+/// Highlights the selected diagram scale tab with a glass pill on macOS 26+, falling back to a surface fill.
 struct GlassScaleTabModifier: ViewModifier {
     let isSelected: Bool
 

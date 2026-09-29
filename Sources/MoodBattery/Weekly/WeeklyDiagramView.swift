@@ -66,22 +66,26 @@ struct WeeklyDiagramView: View {
 
     // MARK: - Geometry
 
+    /// Maps a day index (0-6) to its horizontal centre within the canvas.
     private func x(forDayIndex index: Int, size: CGSize) -> CGFloat {
         let dayWidth = size.width / 7
         return (CGFloat(index) + 0.5) * dayWidth
     }
 
+    /// Maps a mood value to its vertical position in the canvas.
     private func y(for mood: Double, size: CGSize) -> CGFloat {
         let usable = size.height - verticalPadding * 2
         return verticalPadding + CGFloat(1 - MoodScale.normalized(mood)) * usable
     }
 
+    /// Converts a daily average tuple into a canvas coordinate.
     private func point(for average: (dayIndex: Int, mood: Double, flavour: Double), size: CGSize) -> CGPoint {
         CGPoint(x: x(forDayIndex: average.dayIndex, size: size), y: y(for: average.mood, size: size))
     }
 
     // MARK: - Drawing
 
+    /// Draws a dashed horizontal baseline across the canvas width.
     private func drawBaseline(in context: GraphicsContext, size: CGSize) {
         let baselineY = y(for: MoodScale.baseline, size: size)
         var path = Path()
@@ -90,6 +94,7 @@ struct WeeklyDiagramView: View {
         context.stroke(path, with: .color(.white.opacity(0.35)), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
     }
 
+    /// Draws the mood line with gradient segments and filled dots at each data point.
     private func drawSeries(in context: GraphicsContext, size: CGSize) {
         let plotted = dailyAverages.map { average in
             (pos: point(for: average, size: size), color: MoodColor.color(mood: average.mood, flavour: average.flavour))

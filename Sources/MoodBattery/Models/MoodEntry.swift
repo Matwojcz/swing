@@ -15,6 +15,7 @@ struct MoodEntry: Identifiable, Codable, Equatable {
 extension MoodEntry: FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "moodEntry"
 
+    /// Captures the auto-incremented row ID after a successful insert.
     mutating func didInsert(_ inserted: InsertionSuccess) {
         id = inserted.rowID
     }

@@ -123,6 +123,7 @@ struct MoodEntryEditor: View {
         targetDate ?? Date()
     }
 
+    /// Validates no duplicate entry exists for the target day, then persists the new mood entry and resets the form.
     private func save() {
         do {
             if try store.hasEntry(on: entryDate) {

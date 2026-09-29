@@ -146,10 +146,12 @@ struct ContentView: View {
         }
     }
 
+    /// Refreshes the entries array from the database.
     private func reload() {
         entries = (try? store.fetchAll()) ?? []
     }
 
+    /// Processes selected markdown files, parsing diary entries and opening the import preview sheet.
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
@@ -172,6 +174,7 @@ struct ContentView: View {
         }
     }
 
+    /// Generates 6 months of random-walk mood entries for development and testing.
     private func seedDummyData() {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
@@ -199,6 +202,7 @@ struct ContentView: View {
         reload()
     }
 
+    /// Moves the detail panel selection to the previous (-1) or next (+1) entry in the list.
     private func navigateEntry(direction: Int) {
         guard let current = selectedEntry,
               let idx = entries.firstIndex(where: { $0.id == current.id }) else { return }
@@ -212,11 +216,13 @@ struct ContentView: View {
         }
     }
 
+    /// Wipes all mood entries from the database and refreshes the view.
     private func clearAllData() {
         try? store.deleteAll()
         reload()
     }
 
+    /// Builds a CSV string from all entries and presents a save dialog.
     private func exportCSV() {
         let header = "id,mood,flavour,title,note,timestamp"
         let rows = entries.map { e in
@@ -234,6 +240,7 @@ struct ContentView: View {
         saveFile(content: csv, defaultName: "mood-battery-export.csv", contentType: .commaSeparatedText)
     }
 
+    /// Encodes all entries as pretty-printed JSON and presents a save dialog.
     private func exportJSON() {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -243,6 +250,7 @@ struct ContentView: View {
         saveFile(content: json, defaultName: "mood-battery-export.json", contentType: .json)
     }
 
+    /// Opens an NSSavePanel and writes the given content to the user-chosen location.
     private func saveFile(content: String, defaultName: String, contentType: UTType) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [contentType]
@@ -252,6 +260,7 @@ struct ContentView: View {
         try? content.write(to: url, atomically: true, encoding: .utf8)
     }
 
+    /// Wraps a string in double quotes and escapes inner quotes if it contains CSV-special characters.
     private func csvEscape(_ value: String) -> String {
         if value.contains(",") || value.contains("\"") || value.contains("\n") {
             return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
@@ -265,6 +274,7 @@ struct ContentView: View {
         return f
     }()
 
+    /// Saves all reviewed import entries to the database and closes the preview sheet.
     private func confirmImport() {
         for entry in pendingImportEntries {
             let mood = MoodEntry(

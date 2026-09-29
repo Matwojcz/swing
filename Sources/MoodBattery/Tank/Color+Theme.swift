@@ -4,6 +4,7 @@ import SwiftUI
 extension Color {
     /// Matches an appearance-adaptive color pair, mirroring index.html's
     /// `--surface-1` / `--border-strong` CSS custom properties.
+    /// Creates an appearance-adaptive colour that switches between light and dark variants based on the system theme.
     init(light: Color, dark: Color) {
         self.init(NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua

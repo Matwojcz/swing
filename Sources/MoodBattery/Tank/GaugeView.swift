@@ -79,10 +79,12 @@ struct GaugeView: View {
 
     // MARK: - Geometry
 
+    /// Converts a mood value to a needle angle in degrees (180 = left/depressive, 0 = right/hype).
     private func angleDegrees(for value: Double) -> Double {
         180 - MoodScale.normalized(value) * 180
     }
 
+    /// Computes the (x, y) position on the semicircular arc for a mood value at a given radius from the hub centre.
     private func point(for value: Double, radius: CGFloat) -> CGPoint {
         let theta = angleDegrees(for: value) * .pi / 180
         return CGPoint(x: cx + radius * cos(theta), y: cy - radius * sin(theta))
@@ -90,6 +92,7 @@ struct GaugeView: View {
 
     // MARK: - Drawing
 
+    /// Draws the coloured semicircular band by stroking radial lines at each mood value.
     private func drawBand(in context: GraphicsContext) {
         let ticks = 100
         for i in 0...ticks {
@@ -101,6 +104,7 @@ struct GaugeView: View {
         }
     }
 
+    /// Draws the dashed white tick mark at the baseline (neutral) position on the gauge.
     private func drawBaselineTick(in context: GraphicsContext) {
         var path = Path()
         path.move(to: point(for: MoodScale.baseline, radius: innerRadius - 14))
@@ -112,6 +116,7 @@ struct GaugeView: View {
         )
     }
 
+    /// Draws short red tick marks beyond the redline threshold, indicating the hype danger zone.
     private func drawRedlineTicks(in context: GraphicsContext) {
         let steps = 24
         for i in 0...steps {
@@ -123,6 +128,7 @@ struct GaugeView: View {
         }
     }
 
+    /// Draws the needle line from the hub centre to the current mood position.
     private func drawNeedle(in context: GraphicsContext) {
         var path = Path()
         path.move(to: CGPoint(x: cx, y: cy))
@@ -133,6 +139,7 @@ struct GaugeView: View {
         context.stroke(path, with: .color(strokeColor), style: StrokeStyle(lineWidth: 3 * Self.scale, lineCap: .round))
     }
 
+    /// Draws the filled circle at the pivot point of the needle.
     private func drawHub(in context: GraphicsContext) {
         let hubRadius = 9 * Self.scale
         let rect = CGRect(x: cx - hubRadius, y: cy - hubRadius, width: hubRadius * 2, height: hubRadius * 2)
@@ -143,6 +150,7 @@ struct GaugeView: View {
 
     // MARK: - Drag
 
+    /// Creates a drag gesture that maps touch/cursor position to a mood value snapped to half-point steps.
     private func dragGesture(_ onMoodChange: @escaping (Double) -> Void) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in

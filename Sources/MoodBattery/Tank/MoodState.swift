@@ -2,6 +2,7 @@ import Foundation
 
 /// Descriptive only — never present this as a diagnosis or clinical assessment.
 enum MoodState {
+    /// Returns a human-readable band label (e.g. "baseline", "elevated", "high, irritable") for the given mood and flavour values.
     static func label(mood: Double, flavour: Double) -> String {
         let flavourTag = flavour < 0.35 ? "calm" : (flavour > 0.65 ? "irritable" : "normal")
         if mood < 1.5 { return "severe depressive" }

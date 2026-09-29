@@ -10,10 +10,12 @@ enum MoodScale {
     static let episodeDepressiveThreshold: Double = 3.5
     static let episodeElevatedThreshold: Double = 6.5
 
+    /// Formats a mood value for display, dropping the decimal when it's a whole number.
     static func format(_ mood: Double) -> String {
         mood.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(mood))" : String(format: "%.1f", mood)
     }
 
+    /// Maps a mood value to the 0...1 range for use in geometry calculations.
     static func normalized(_ mood: Double) -> Double {
         mood / max
     }

@@ -33,6 +33,7 @@ struct MoodDiagramView: View {
 
     private var pageCount: Int { scale.pageCount }
 
+    /// Returns the array of calendar dates visible on the given page, working backwards from today.
     private func daysForPage(_ page: Int) -> [Date] {
         let offset = page - (pageCount - 1)
         let today = calendar.startOfDay(for: Date())
@@ -42,6 +43,7 @@ struct MoodDiagramView: View {
         }
     }
 
+    /// Extends a page's date range by borrowing days from adjacent pages so mood lines connect across boundaries.
     private func extendedDaysForPage(_ page: Int) -> (all: [Date], ownStartIndex: Int) {
         let own = daysForPage(page)
         var extended = own
@@ -102,6 +104,7 @@ struct MoodDiagramView: View {
 
     // MARK: - Page content
 
+    /// Builds the full content for one diagram page: Canvas with episodes, baseline, mood line, plus tap targets and day labels.
     private func diagramPage(page: Int) -> some View {
         let days = daysForPage(page)
 
@@ -190,6 +193,7 @@ struct MoodDiagramView: View {
         }
     }
 
+    /// Zooms in one level (year→month, month→week) and navigates to the page containing the tapped date.
     private func zoomToDate(_ date: Date, from currentScale: DiagramScale) {
         let today = calendar.startOfDay(for: Date())
         let target = calendar.startOfDay(for: date)
@@ -233,6 +237,7 @@ struct MoodDiagramView: View {
         }
     }
 
+    /// Selects the aggregation strategy (daily or weekly averages) based on the current diagram scale.
     private func dataPoints(for days: [Date]) -> [DataPoint] {
         switch scale {
         case .week, .month:
@@ -242,6 +247,7 @@ struct MoodDiagramView: View {
         }
     }
 
+    /// Computes one averaged data point per day, skipping days with no entries.
     private func dailyAverages(for days: [Date]) -> [DataPoint] {
         let grouped = entriesByDay
         return days.enumerated().compactMap { index, day in
@@ -258,6 +264,7 @@ struct MoodDiagramView: View {
         }
     }
 
+    /// Computes data points including boundary days from adjacent pages, returning both the full drawing set and the tappable subset.
     private func boundaryDataPoints(for page: Int) -> (drawing: [DataPoint], tappable: [DataPoint]) {
         let (extDays, ownStart) = extendedDaysForPage(page)
         let raw = dailyAverages(for: extDays)
@@ -273,6 +280,7 @@ struct MoodDiagramView: View {
         return (remapped, tappable)
     }
 
+    /// Aggregates entries into 7-day chunks for the year view, placing each point at the chunk's midpoint.
     private func weeklyAverages(for days: [Date]) -> [DataPoint] {
         let grouped = entriesByDay
         var points: [DataPoint] = []
@@ -313,6 +321,7 @@ struct MoodDiagramView: View {
 
     // MARK: - Month header
 
+    /// Builds the header showing the month/year label and an optional "Today" button to jump to the latest page.
     private func monthHeader(for page: Int) -> some View {
         let days = daysForPage(page)
         return HStack {
@@ -337,6 +346,7 @@ struct MoodDiagramView: View {
         }
     }
 
+    /// Formats the page's date range into a human-readable label (e.g. "March 2025" or "March – April 2025").
     private func monthLabel(for days: [Date]) -> String {
         guard let first = days.first, let last = days.last else { return "" }
 
@@ -366,6 +376,7 @@ struct MoodDiagramView: View {
 
     // MARK: - Day labels
 
+    /// Renders the date labels beneath the diagram, adapted to the current scale (daily, weekly samples, or monthly).
     private func dayLabels(for days: [Date]) -> some View {
         HStack(spacing: 0) {
             switch scale {
@@ -453,6 +464,7 @@ struct MoodDiagramView: View {
             }
     }
 
+    /// Steps the diagram scale one level closer (year→month→week) and resets to the latest page.
     private func zoomIn() {
         switch scale {
         case .year: scale = .month
@@ -462,6 +474,7 @@ struct MoodDiagramView: View {
         currentPage = pageCount - 1
     }
 
+    /// Steps the diagram scale one level wider (week→month→year) and resets to the latest page.
     private func zoomOut() {
         switch scale {
         case .week: scale = .month
@@ -473,11 +486,13 @@ struct MoodDiagramView: View {
 
     // MARK: - Geometry
 
+    /// Maps a day index to its horizontal centre position within the canvas width.
     private func x(forDayIndex index: Int, totalDays: Int, width: CGFloat) -> CGFloat {
         let dayWidth = width / CGFloat(totalDays)
         return (CGFloat(index) + 0.5) * dayWidth
     }
 
+    /// Maps a mood value to its vertical position (0=top/hype, max=bottom/depressive) within the canvas height.
     private func y(for mood: Double, height: CGFloat) -> CGFloat {
         let usable = height - verticalPadding * 2
         return verticalPadding + CGFloat(1 - MoodScale.normalized(mood)) * usable
@@ -485,6 +500,7 @@ struct MoodDiagramView: View {
 
     // MARK: - Drawing
 
+    /// Draws a dashed horizontal line at the baseline mood level across the full canvas width.
     private func drawBaseline(in context: GraphicsContext, size: CGSize) {
         let baselineY = y(for: MoodScale.baseline, height: size.height)
         var path = Path()
@@ -508,6 +524,7 @@ struct MoodDiagramView: View {
         var averageFlavour: Double
     }
 
+    /// Detects depressive and elevated episodes across the full entry timeline using a sliding 5-day window (4-of-5 threshold), then merges nearby episodes of the same type.
     private var globalEpisodes: [Episode] {
         let grouped = entriesByDay
         let sortedDates = entries.map { calendar.startOfDay(for: $0.timestamp) }
@@ -624,6 +641,7 @@ struct MoodDiagramView: View {
         var episode: Episode
     }
 
+    /// Clips global episodes to a page's date range, tracking whether each band extends beyond the page edges.
     private func episodesForPage(_ days: [Date]) -> [PageEpisode] {
         guard let pageStart = days.first, let pageEnd = days.last else { return [] }
         var result: [PageEpisode] = []
@@ -645,6 +663,7 @@ struct MoodDiagramView: View {
         return result
     }
 
+    /// Draws translucent colour bands for detected mood episodes, extending to page edges where they cross boundaries.
     private func drawEpisodes(_ pageEpisodes: [PageEpisode], in context: GraphicsContext, size: CGSize) {
         let totalDays = scale.dayCount
         let fadeWidth: CGFloat = 12
@@ -687,6 +706,7 @@ struct MoodDiagramView: View {
         }
     }
 
+    /// Draws the mood line (gradient segments between points) and dots, optionally restricting dots to a day index range to hide boundary points.
     private func drawSeries(_ points: [DataPoint], in context: GraphicsContext, size: CGSize, dotRange: Range<Int>? = nil) {
         let totalDays = scale.dayCount
         let plotted = points.enumerated().map { idx, dp in

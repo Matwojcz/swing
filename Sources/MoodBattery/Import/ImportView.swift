@@ -96,6 +96,7 @@ struct ImportPreviewSheet: View {
         }
     }
 
+    /// Builds the right-side editor panel for adjusting mood, flavour, and viewing the note of a selected import entry.
     private func entryEditor(for index: Int) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -143,6 +144,7 @@ struct ImportPreviewSheet: View {
         }
     }
 
+    /// Maps a flavour value to its display label: "calm", "normal", or "irritable".
     private func flavourLabel(_ v: Double) -> String {
         if v < 0.35 { return "calm" }
         if v > 0.65 { return "irritable" }

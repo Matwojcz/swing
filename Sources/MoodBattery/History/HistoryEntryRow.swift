@@ -23,6 +23,7 @@ struct HistoryEntryRow: View {
         return formatter
     }()
 
+    /// Returns the entry's title, falling back to a note prefix, then a mood state label.
     private var displayTitle: String {
         if let title = entry.title, !title.isEmpty {
             return title

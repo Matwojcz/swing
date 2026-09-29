@@ -6,6 +6,7 @@ final class DatabaseManager {
 
     let dbQueue: DatabaseQueue
 
+    /// Opens (or creates) the SQLite database at the given path, defaulting to the app's Application Support directory, and runs pending migrations.
     init(path: String? = nil) throws {
         let dbPath: String
         if let path {

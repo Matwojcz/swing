@@ -34,9 +34,7 @@ struct EntryDetailPanel: View {
     }
 
     private var flavourLabel: String {
-        if entry.flavour < 0.35 { return "calm" }
-        if entry.flavour > 0.65 { return "irritable" }
-        return "normal"
+        MoodScale.flavourLabel(entry.flavour)
     }
 
     var body: some View {

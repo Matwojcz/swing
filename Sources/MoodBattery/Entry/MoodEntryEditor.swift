@@ -15,11 +15,12 @@ struct MoodEntryEditor: View {
     @State private var saveError: String?
 
     var targetDate: Date?
+    /// Called with the composed entry when the user taps "Log entry". Return nil on success or a user-facing error string to display. Persistence and duplicate-day validation live in the parent.
+    var onSaveRequest: ((MoodEntry) -> String?)?
+    /// Fired after a successful save so the parent can refresh state and clear the retro-date, etc.
     var onSave: (() -> Void)?
     /// When set, the gauge and flavour track display this entry's values in read-only mode instead of the editor draft.
     var previewEntry: MoodEntry?
-
-    private let store = MoodEntryStore()
 
     private let headerHeight: CGFloat = 56
     private let headerGaugeSpacing: CGFloat = 8
@@ -97,10 +98,7 @@ struct MoodEntryEditor: View {
     }
 
     private var flavourLabel: String {
-        let f = displayFlavour
-        if f < 0.35 { return "calm" }
-        if f > 0.65 { return "irritable" }
-        return "normal"
+        MoodScale.flavourLabel(displayFlavour)
     }
 
     private var flavourTrack: some View {
@@ -137,28 +135,23 @@ struct MoodEntryEditor: View {
         targetDate ?? Date()
     }
 
-    /// Validates no duplicate entry exists for the target day, then persists the new mood entry and resets the form.
+    /// Builds the entry from the current form and asks the parent to persist it; on success clears the form and notifies the parent.
     private func save() {
-        do {
-            if try store.hasEntry(on: entryDate) {
-                saveError = "An entry already exists for this day."
-                return
-            }
-            let entry = MoodEntry(
-                id: nil,
-                mood: mood,
-                flavour: flavour,
-                title: title.isEmpty ? nil : title,
-                note: note.isEmpty ? nil : note,
-                timestamp: entryDate
-            )
-            try store.save(entry)
+        let entry = MoodEntry(
+            id: nil,
+            mood: mood,
+            flavour: flavour,
+            title: title.isEmpty ? nil : title,
+            note: note.isEmpty ? nil : note,
+            timestamp: entryDate
+        )
+        if let error = onSaveRequest?(entry) {
+            saveError = error
+        } else {
             title = ""
             note = ""
             saveError = nil
             onSave?()
-        } catch {
-            saveError = "Couldn't save: \(error.localizedDescription)"
         }
     }
 

@@ -22,7 +22,17 @@ struct ContentView: View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 VStack(alignment: .leading, spacing: 24) {
-                    MoodEntryEditor(targetDate: retroDate, onSave: {
+                    MoodEntryEditor(targetDate: retroDate, onSaveRequest: { entry in
+                        do {
+                            if try store.hasEntry(on: entry.timestamp) {
+                                return "An entry already exists for this day."
+                            }
+                            try store.save(entry)
+                            return nil
+                        } catch {
+                            return "Couldn't save: \(error.localizedDescription)"
+                        }
+                    }, onSave: {
                         retroDate = nil
                         reload()
                     }, previewEntry: selectedEntry)
@@ -276,31 +286,15 @@ struct ContentView: View {
         reload()
     }
 
-    /// Builds a CSV string from all entries and presents a save dialog.
+    /// Serialises all entries as CSV and presents a save dialog.
     private func exportCSV() {
-        let header = "id,mood,flavour,title,note,timestamp"
-        let rows = entries.map { e in
-            let fields: [String] = [
-                e.id.map(String.init) ?? "",
-                String(e.mood),
-                String(e.flavour),
-                csvEscape(e.title ?? ""),
-                csvEscape(e.note ?? ""),
-                Self.iso8601Formatter.string(from: e.timestamp)
-            ]
-            return fields.joined(separator: ",")
-        }
-        let csv = ([header] + rows).joined(separator: "\n")
+        let csv = ExportService.csv(from: entries)
         saveFile(content: csv, defaultName: "mood-battery-export.csv", contentType: .commaSeparatedText)
     }
 
-    /// Encodes all entries as pretty-printed JSON and presents a save dialog.
+    /// Serialises all entries as JSON and presents a save dialog.
     private func exportJSON() {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(entries),
-              let json = String(data: data, encoding: .utf8) else { return }
+        guard let json = try? ExportService.json(from: entries) else { return }
         saveFile(content: json, defaultName: "mood-battery-export.json", contentType: .json)
     }
 
@@ -313,20 +307,6 @@ struct ContentView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         try? content.write(to: url, atomically: true, encoding: .utf8)
     }
-
-    /// Wraps a string in double quotes and escapes inner quotes if it contains CSV-special characters.
-    private func csvEscape(_ value: String) -> String {
-        if value.contains(",") || value.contains("\"") || value.contains("\n") {
-            return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-        }
-        return value
-    }
-
-    private static let iso8601Formatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
 
     /// Saves all reviewed import entries to the database and closes the preview sheet.
     private func confirmImport() {

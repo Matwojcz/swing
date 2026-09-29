@@ -19,4 +19,11 @@ enum MoodScale {
     static func normalized(_ mood: Double) -> Double {
         mood / max
     }
+
+    /// Maps a 0...1 flavour value to its user-facing label: "calm", "normal", or "irritable".
+    static func flavourLabel(_ flavour: Double) -> String {
+        if flavour < 0.35 { return "calm" }
+        if flavour > 0.65 { return "irritable" }
+        return "normal"
+    }
 }

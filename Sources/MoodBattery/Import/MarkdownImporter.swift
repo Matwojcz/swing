@@ -9,42 +9,6 @@ struct MarkdownImporter {
         var timestamp: Date
     }
 
-    enum ImportError: LocalizedError {
-        case noEntriesFound
-        case fileUnreadable(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .noEntriesFound:
-                return "No diary entries with dates found in this file."
-            case .fileUnreadable(let path):
-                return "Couldn't read file at \(path)."
-            }
-        }
-    }
-
-    private let store = MoodEntryStore()
-
-    /// Reads a markdown file, parses diary entries from it, saves them to the database, and returns the count imported.
-    func importFile(at url: URL) throws -> Int {
-        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
-            throw ImportError.fileUnreadable(url.path)
-        }
-        let entries = parse(content)
-        if entries.isEmpty { throw ImportError.noEntriesFound }
-        for parsed in entries {
-            let entry = MoodEntry(
-                id: nil,
-                mood: parsed.mood,
-                flavour: parsed.flavour,
-                note: parsed.note.isEmpty ? nil : parsed.note,
-                timestamp: parsed.timestamp
-            )
-            try store.save(entry)
-        }
-        return entries.count
-    }
-
     // MARK: - Parsing
 
     /// Parses raw markdown text into diary entries by scanning for date headings and extracting mood/flavour fields or estimating them from text.

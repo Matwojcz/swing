@@ -123,7 +123,7 @@ struct ImportPreviewSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(flavourLabel(entries[index].flavour))
+                        Text(MoodScale.flavourLabel(entries[index].flavour))
                             .font(.system(size: 13, weight: .semibold))
                     }
                     Slider(value: $entries[index].flavour, in: 0...1)
@@ -144,10 +144,4 @@ struct ImportPreviewSheet: View {
         }
     }
 
-    /// Maps a flavour value to its display label: "calm", "normal", or "irritable".
-    private func flavourLabel(_ v: Double) -> String {
-        if v < 0.35 { return "calm" }
-        if v > 0.65 { return "irritable" }
-        return "normal"
-    }
 }

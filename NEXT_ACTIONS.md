@@ -35,3 +35,26 @@ should visually track the selection:
 ### Doc comments
 - New `highlightedEntry` param on `MoodDiagramView` needs a comment.
 - Update `drawSeries` comment to mention the highlight ring.
+
+---
+
+## Year-view month labels: duplicates and missing month
+
+In `MoodDiagramView.swift` the `.year` case of `dayLabels(for:)` samples
+at a fixed 30-day stride (`monthIdx * 30` for `monthIdx` in 0..<12).
+Real months average ~30.44 days, so after a few cycles the sampled day
+sits in the same calendar month as the previous sample (May shows twice;
+Feb or similar gets skipped), and the loop never reaches day 331-364 so
+the final month (e.g. Sep) is never labelled.
+
+**Fix:** walk through `days` once, emit a label the first time each
+(year, month) pair appears. Keeps the equal-width layout via
+`.frame(maxWidth: .infinity)`. Up to 13 labels possible (a 365-day span
+can cross 13 calendar months) — still readable.
+
+### Where to touch
+- `MoodDiagramView.swift` — replace the `.year` branch in `dayLabels`
+  with a scan over `days` producing month-start dates.
+
+### Doc comments
+- Update `dayLabels(for:)` comment to describe the new year-case behaviour.

@@ -52,19 +52,37 @@ your mood over time across week, month, and year scales.
 
 ```bash
 # Clone the repo
-git clone https://github.com/matwojcz/mood-battery.git
-cd mood-battery
+git clone https://github.com/matwojcz/swing.git
+cd swing
 
 # Install XcodeGen if you don't have it
 brew install xcodegen
 
 # Generate the Xcode project and open it
 xcodegen generate
-open MoodBattery.xcodeproj
+open Swing.xcodeproj
 ```
 
 Build and run from Xcode (Cmd+R). The app stores data in a local SQLite
 database — no account or network connection needed.
+
+Run `xcodegen generate` again after adding or removing source files. The
+project has no test target yet.
+
+## Database
+
+SQLite file at `~/Library/Application Support/MoodBattery/moodbattery.sqlite`,
+table `moodEntry`, migrated by GRDB on launch:
+
+| Column      | Type     | Notes                                                    |
+|-------------|----------|----------------------------------------------------------|
+| `id`        | integer  | Auto-incremented primary key                             |
+| `mood`      | double   | 0-10 in 0.5 steps, baseline 5                            |
+| `flavour`   | double   | 0-1, calm (0) to irritable (1)                           |
+| `title`     | text     | Optional short summary                                   |
+| `note`      | text     | Optional diary text                                      |
+| `timestamp` | datetime | UTC instant the entry was logged                         |
+| `localDate` | text     | `yyyy-MM-dd` calendar day the entry belongs to           |
 
 ## MCP server (optional)
 
@@ -83,6 +101,21 @@ Add to your Claude config (`.mcp.json` or `claude_desktop_config.json`):
   }
 }
 ```
+
+Tools:
+
+| Tool                  | Arguments                                              | Purpose                                  |
+|-----------------------|--------------------------------------------------------|------------------------------------------|
+| `save_mood_entry`     | `mood`, `flavour`, `title?`, `note?`, `timestamp?`     | Log an entry (defaults to now)           |
+| `update_mood_entry`   | `entry_id`, plus any of the fields above               | Change fields of an entry                |
+| `list_recent_entries` | `count?` (default 10, max 100)                         | Newest entries first                     |
+| `get_entry`           | `entry_id`                                             | Full details of one entry                |
+| `delete_entry`        | `entry_id`                                             | Delete an entry                          |
+| `search_entries`      | `query`, `limit?` (default 20)                         | Search titles and notes                  |
+| `entries_for_date`    | `date` (`YYYY-MM-DD`)                                  | All entries for a day                    |
+| `mood_summary`        | `days?` (default 7)                                    | Average, range and count over a period   |
+
+The server needs the app to have run once so the database exists and is migrated.
 
 ## Time zones
 

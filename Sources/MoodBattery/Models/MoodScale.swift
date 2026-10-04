@@ -22,7 +22,7 @@ enum MoodScale {
     static let episodeElevatedToleratedMin: Double = 4.5
     /// Most consecutive non-qualifying days (tolerated or unlogged) a run may bridge.
     static let episodeDepressiveMaxGapDays = 2
-    static let episodeElevatedMaxGapDays = 1
+    static let episodeElevatedMaxGapDays = 2
 
     /// Formats a mood value for display, dropping the decimal when it's a whole number.
     static func format(_ mood: Double) -> String {

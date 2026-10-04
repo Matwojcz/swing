@@ -2,9 +2,12 @@ import Foundation
 
 /// Detects sustained mood-episode periods (depressive or elevated) across a set of entries.
 ///
-/// Uses a sliding 5-day window: if 4+ days in the window cross the threshold in one direction,
-/// the span is flagged as an episode. Consecutive matching windows extend the same episode.
-/// Nearby episodes of the same type (gap ≤ 3 days) are merged, with averages recomputed.
+/// Modelled on DSM-5 bipolar II: a depressive episode needs at least 14 days, an elevated
+/// (hypomanic) one at least 4. A run starts and ends on a day whose average mood crosses the
+/// threshold (below 3.5 / above 6.5). Between those days it bridges up to a few consecutive
+/// non-qualifying days — unlogged days, or logged days near baseline (up to 5.5 for depressive runs,
+/// down to 4.5 for elevated ones) — but a logged day on the opposite side ends it. The span must also
+/// be at least 70% logged qualifying days, so sparse logging can't stretch an episode.
 ///
 /// Pure domain logic — no dependencies on views. Callers supply the calendar so tests can pin
 /// a deterministic time zone.
@@ -14,7 +17,7 @@ enum EpisodeDetector {
         case depressive, elevated
     }
 
-    /// A contiguous span of days flagged as a single mood episode, with the average mood and flavour across the span.
+    /// A contiguous span of days flagged as a single mood episode, with the average mood and flavour across its logged days.
     struct Episode {
         var startDate: Date
         var endDate: Date
@@ -29,14 +32,24 @@ enum EpisodeDetector {
         var flavour: Double
     }
 
-    /// Runs global episode detection across all entries and returns merged episodes of both types.
+    /// How a day relates to the run being scanned.
+    private enum DayKind {
+        /// Past the episode threshold.
+        case qualifying
+        /// Unlogged, or logged near baseline: bridged within the gap limit but not counted.
+        case gap
+        /// Logged on the opposite side of baseline: ends the run.
+        case breaking
+    }
+
+    /// Runs global episode detection across all entries and returns the depressive and elevated episodes, ordered by start date.
     static func detect(entries: [MoodEntry], calendar: Calendar = .current) -> [Episode] {
         let grouped = Dictionary(grouping: entries) { $0.day(in: calendar) }
         let sortedDates = entries.map { $0.day(in: calendar) }
         guard let earliest = sortedDates.min(), let latest = sortedDates.max() else { return [] }
 
         let totalDays = (calendar.dateComponents([.day], from: earliest, to: latest).day ?? 0) + 1
-        guard totalDays >= 5 else { return [] }
+        guard totalDays >= MoodScale.episodeElevatedMinDays else { return [] }
 
         let allDays = (0..<totalDays).map { calendar.date(byAdding: .day, value: $0, to: earliest)! }
 
@@ -50,66 +63,79 @@ enum EpisodeDetector {
             )
         }
 
-        var episodes: [Episode] = []
-        episodes.append(contentsOf: scan(
-            dayMoods: dayMoods, allDays: allDays,
-            threshold: MoodScale.episodeDepressiveThreshold, below: true
-        ))
-        episodes.append(contentsOf: scan(
-            dayMoods: dayMoods, allDays: allDays,
-            threshold: MoodScale.episodeElevatedThreshold, below: false
-        ))
-
-        return merge(episodes: episodes, calendar: calendar)
+        let depressive = scan(
+            dayMoods: dayMoods, allDays: allDays, below: true,
+            threshold: MoodScale.episodeDepressiveThreshold,
+            toleratedLimit: MoodScale.episodeDepressiveToleratedMax,
+            minDays: MoodScale.episodeDepressiveMinDays,
+            maxGap: MoodScale.episodeDepressiveMaxGapDays
+        )
+        let elevated = scan(
+            dayMoods: dayMoods, allDays: allDays, below: false,
+            threshold: MoodScale.episodeElevatedThreshold,
+            toleratedLimit: MoodScale.episodeElevatedToleratedMin,
+            minDays: MoodScale.episodeElevatedMinDays,
+            maxGap: MoodScale.episodeElevatedMaxGapDays
+        )
+        return (depressive + elevated).sorted { $0.startDate < $1.startDate }
     }
 
-    /// Sliding-window scan over day-mood series: flags spans where 4 of 5 days cross the threshold.
-    private static func scan(dayMoods: [DayMood?], allDays: [Date], threshold: Double, below: Bool) -> [Episode] {
+    /// Classifies one day for a scan: qualifying past `threshold`, breaking beyond `toleratedLimit` on the opposite side, otherwise a gap.
+    private static func kind(of day: DayMood?, below: Bool, threshold: Double, toleratedLimit: Double) -> DayKind {
+        guard let day else { return .gap }
+        if below {
+            if day.mood < threshold { return .qualifying }
+            return day.mood > toleratedLimit ? .breaking : .gap
+        }
+        if day.mood > threshold { return .qualifying }
+        return day.mood < toleratedLimit ? .breaking : .gap
+    }
+
+    /// Scans for runs that start on a qualifying day, bridge at most `maxGap` consecutive gap days, stop at a breaking day, and are trimmed to their last qualifying day.
+    /// A run becomes an episode if it spans at least `minDays` and at least 70% of the span is qualifying days; otherwise scanning resumes from the next day.
+    private static func scan(dayMoods: [DayMood?], allDays: [Date], below: Bool, threshold: Double,
+                             toleratedLimit: Double, minDays: Int, maxGap: Int) -> [Episode] {
+        let kinds = dayMoods.map { kind(of: $0, below: below, threshold: threshold, toleratedLimit: toleratedLimit) }
         var result: [Episode] = []
-        let windowSize = 5
-        guard dayMoods.count >= windowSize else { return result }
+        var start = 0
 
-        var inEpisode = false
-        var episodeStart = 0
-        var lastEnd = 0
+        while start < kinds.count {
+            guard kinds[start] == .qualifying else { start += 1; continue }
 
-        for i in 0...(dayMoods.count - windowSize) {
-            var qualifying = 0
-            for j in i..<(i + windowSize) {
-                guard let m = dayMoods[j] else { continue }
-                if below ? m.mood < threshold : m.mood > threshold {
+            var lastQualifying = start
+            var qualifying = 1
+            var gapRun = 0
+            var j = start + 1
+            while j < kinds.count {
+                if kinds[j] == .qualifying {
+                    lastQualifying = j
                     qualifying += 1
+                    gapRun = 0
+                } else if kinds[j] == .gap {
+                    gapRun += 1
+                    if gapRun > maxGap { break }
+                } else {
+                    break
                 }
+                j += 1
             }
 
-            if qualifying >= 4 {
-                if !inEpisode {
-                    inEpisode = true
-                    episodeStart = i
-                }
-                lastEnd = i + windowSize - 1
-            } else if inEpisode {
+            let span = lastQualifying - start + 1
+            if span >= minDays && Double(qualifying) >= MoodScale.episodeMinQualifyingShare * Double(span) {
                 result.append(makeEpisode(
                     dayMoods: dayMoods, allDays: allDays,
-                    start: episodeStart, end: min(lastEnd, dayMoods.count - 1),
+                    start: start, end: lastQualifying,
                     threshold: threshold, below: below
                 ))
-                inEpisode = false
+                start = lastQualifying + 1
+            } else {
+                start += 1
             }
         }
-
-        if inEpisode {
-            result.append(makeEpisode(
-                dayMoods: dayMoods, allDays: allDays,
-                start: episodeStart, end: min(lastEnd, dayMoods.count - 1),
-                threshold: threshold, below: below
-            ))
-        }
-
         return result
     }
 
-    /// Builds an Episode from the day range, computing average mood/flavour across the qualifying days.
+    /// Builds an Episode from the day range, computing average mood/flavour across the logged days.
     private static func makeEpisode(dayMoods: [DayMood?], allDays: [Date], start: Int, end: Int, threshold: Double, below: Bool) -> Episode {
         var moodAcc = 0.0, flavourAcc = 0.0, cnt = 0
         for j in start...end {
@@ -122,27 +148,5 @@ enum EpisodeDetector {
             averageMood: cnt > 0 ? moodAcc / Double(cnt) : threshold,
             averageFlavour: cnt > 0 ? flavourAcc / Double(cnt) : 0.5
         )
-    }
-
-    /// Merges episodes of the same type separated by ≤ 3 days into single episodes, recomputing averages.
-    private static func merge(episodes: [Episode], calendar: Calendar) -> [Episode] {
-        var merged: [Episode] = []
-        let sorted = episodes.sorted { $0.startDate < $1.startDate }
-        for ep in sorted {
-            if let last = merged.last,
-               last.type == ep.type,
-               let gap = calendar.dateComponents([.day], from: last.endDate, to: ep.startDate).day,
-               gap <= 3 {
-                var combined = merged.removeLast()
-                combined.endDate = ep.endDate
-                let totalCount = 2.0
-                combined.averageMood = (last.averageMood + ep.averageMood) / totalCount
-                combined.averageFlavour = (last.averageFlavour + ep.averageFlavour) / totalCount
-                merged.append(combined)
-            } else {
-                merged.append(ep)
-            }
-        }
-        return merged
     }
 }

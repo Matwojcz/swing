@@ -29,8 +29,11 @@ your mood over time across week, month, and year scales.
 - **Mood diagram** — mood over time with a mood-colored line. Week, month,
   and year scales with pinch-to-zoom, paging, and continuous lines across
   page boundaries. The year scale shows weekly averages. Detected mood
-  episodes (sustained depressive or elevated stretches) appear as tinted
-  bands behind the line.
+  episodes appear as tinted bands behind the line: depressive (mood below
+  3.5 for at least 14 days) and elevated (above 6.5 for at least 4 days),
+  following DSM-5 bipolar II durations. Runs tolerate a couple of unlogged or
+  near-baseline days, but a logged day on the opposite side ends them, and at
+  least 70% of the span must be qualifying days.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, or note). Delete entries here.
 - **Keyboard navigation** — up/down arrows flick through entries, ESC

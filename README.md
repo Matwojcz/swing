@@ -13,7 +13,7 @@ energy level (0-10, half-point steps):
   at baseline (5), then through green into gold/orange or red/magenta above.
 - A vertical flavour slider sets the tone of elevated mood: calm on one
   end, irritable on the other.
-- Past ~88, a redline zone with spark particles marks the hype range —
+- Past 8.8, a redline zone with spark particles marks the hype range —
   like a tachometer needle entering a danger zone.
 
 Each entry is saved with an optional title and free-text note. The history

@@ -69,6 +69,6 @@ enum MoodDataAggregator {
 
     /// Groups entries by their calendar day (start-of-day date), used by both aggregators for O(1) day lookups.
     private static func groupByDay(entries: [MoodEntry], calendar: Calendar) -> [Date: [MoodEntry]] {
-        Dictionary(grouping: entries) { calendar.startOfDay(for: $0.timestamp) }
+        Dictionary(grouping: entries) { $0.day(in: calendar) }
     }
 }

@@ -31,8 +31,8 @@ enum EpisodeDetector {
 
     /// Runs global episode detection across all entries and returns merged episodes of both types.
     static func detect(entries: [MoodEntry], calendar: Calendar = .current) -> [Episode] {
-        let grouped = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.timestamp) }
-        let sortedDates = entries.map { calendar.startOfDay(for: $0.timestamp) }
+        let grouped = Dictionary(grouping: entries) { $0.day(in: calendar) }
+        let sortedDates = entries.map { $0.day(in: calendar) }
         guard let earliest = sortedDates.min(), let latest = sortedDates.max() else { return [] }
 
         let totalDays = (calendar.dateComponents([.day], from: earliest, to: latest).day ?? 0) + 1

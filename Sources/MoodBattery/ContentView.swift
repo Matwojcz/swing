@@ -38,7 +38,7 @@ struct ContentView: View {
                     }, previewEntry: selectedEntry)
                     MoodDiagramView(entries: entries, onSelectDate: { date in
                         let cal = Calendar.current
-                        if let entry = entries.first(where: { cal.isDate($0.timestamp, inSameDayAs: date) }) {
+                        if let entry = entries.first(where: { $0.day(in: cal) == cal.startOfDay(for: date) }) {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selectedEntry = entry
                                 isDetailPanelShown = true
@@ -52,7 +52,7 @@ struct ContentView: View {
                                 isDetailPanelShown = false
                             }
                         }
-                    }, scrollToDate: diagramScrollDate)
+                    }, scrollToDate: diagramScrollDate, highlightedEntry: selectedEntry)
                     .padding(.horizontal, 16)
                 }
 

@@ -68,6 +68,13 @@ final class DatabaseManager {
             try db.execute(sql: "UPDATE moodEntry SET mood = mood / 10.0")
         }
 
+        migrator.registerMigration("addLocalDate") { db in
+            try db.alter(table: "moodEntry") { t in
+                t.add(column: "localDate", .text).notNull().defaults(to: "")
+            }
+            try MoodEntryStore.backfillLocalDates(db)
+        }
+
         return migrator
     }
 }

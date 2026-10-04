@@ -84,6 +84,15 @@ Add to your Claude config (`.mcp.json` or `claude_desktop_config.json`):
 }
 ```
 
+## Time zones
+
+Each entry stores its calendar day (`localDate`, `yyyy-MM-dd`) next to the UTC
+`timestamp`. The day is fixed when the entry is logged, so an entry saved at
+23:00 stays on that day when British Summertime ends or you change time zone.
+All grouping (diagram, episodes, one-entry-per-day check) uses `localDate`.
+Rows inserted straight into SQLite without it are backfilled from their
+timestamp the next time the app reads them.
+
 ## Tech stack
 
 - **SwiftUI** — native macOS interface

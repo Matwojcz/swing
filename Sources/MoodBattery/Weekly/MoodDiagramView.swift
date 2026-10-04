@@ -20,6 +20,8 @@ struct MoodDiagramView: View {
     let entries: [MoodEntry]
     var onSelectDate: ((Date) -> Void)?
     var scrollToDate: Date?
+    /// The entry currently selected elsewhere in the app; its dot (or, on the year scale, its week's dot) gets a mood-coloured ring that fades in and out as the selection changes.
+    var highlightedEntry: MoodEntry?
 
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
@@ -93,18 +95,20 @@ struct MoodDiagramView: View {
         .gesture(pinchGesture)
         .onChange(of: scrollToDate) { _, date in
             guard let date else { return }
-            scale = .week
             let today = calendar.startOfDay(for: Date())
             let target = calendar.startOfDay(for: date)
             let daysBetween = calendar.dateComponents([.day], from: target, to: today).day ?? 0
             let weekPage = (pageCount - 1) - (daysBetween / 7)
-            currentPage = max(0, min(pageCount - 1, weekPage))
+            withAnimation(.easeInOut(duration: 0.25)) {
+                scale = .week
+                currentPage = max(0, min(pageCount - 1, weekPage))
+            }
         }
     }
 
     // MARK: - Page content
 
-    /// Builds the full content for one diagram page: Canvas with episodes, baseline, mood line, plus tap targets and day labels.
+    /// Builds the full content for one diagram page: Canvas with episodes, baseline, mood line, a highlight ring for the selected entry (drawn as an overlay so it can fade), plus tap targets and day labels.
     private func diagramPage(page: Int) -> some View {
         let days = daysForPage(page)
 
@@ -136,6 +140,15 @@ struct MoodDiagramView: View {
                         drawSeries(drawingPoints, in: context, size: size,
                                    dotRange: 0..<scale.dayCount)
                     }
+
+                    GeometryReader { geo in
+                        if let point = highlightedPoint(in: tappablePoints, days: days) {
+                            highlightRing(for: point, in: geo.size)
+                                .id(point.dayIndex)
+                                .transition(.opacity)
+                        }
+                    }
+                    .allowsHitTesting(false)
                 }
 
                 if scale == .week {
@@ -191,6 +204,31 @@ struct MoodDiagramView: View {
 
             dayLabels(for: days)
         }
+    }
+
+    /// Finds the plotted point on this page that stands for `highlightedEntry`: the same day on week/month scales, or the 7-day chunk containing that day on the year scale.
+    private func highlightedPoint(in points: [MoodDataAggregator.DataPoint], days: [Date]) -> MoodDataAggregator.DataPoint? {
+        guard let entry = highlightedEntry else { return nil }
+        let day = entry.day(in: calendar)
+        if scale == .year {
+            guard let idx = days.firstIndex(of: day) else { return nil }
+            let midIdx = (idx / 7) * 7 + 3
+            return points.first { $0.dayIndex == midIdx }
+        }
+        return points.first { calendar.startOfDay(for: $0.date) == day }
+    }
+
+    /// Draws a soft halo and ring around a point, coloured like the point itself. Inserted/removed with an opacity transition so it crossfades between dots when the selection moves.
+    private func highlightRing(for point: MoodDataAggregator.DataPoint, in size: CGSize) -> some View {
+        let color = MoodColor.color(mood: point.mood, flavour: point.flavour)
+        let ringRadius = (scale == .year ? 3.0 : dotRadius) + 5
+        return ZStack {
+            Circle().fill(color.opacity(0.25))
+            Circle().stroke(color, lineWidth: 2)
+        }
+        .frame(width: ringRadius * 2, height: ringRadius * 2)
+        .position(x: x(forDayIndex: point.dayIndex, totalDays: scale.dayCount, width: size.width),
+                  y: y(for: point.mood, height: size.height))
     }
 
     /// Zooms in one level (year→month, month→week) and navigates to the page containing the tapped date.
@@ -302,6 +340,7 @@ struct MoodDiagramView: View {
     // MARK: - Day labels
 
     /// Renders the date labels beneath the diagram, adapted to the current scale (daily, weekly samples, or monthly).
+    /// Builds the row of x-axis labels: one per day (week), five spaced dates (month), or one per calendar month in the span (year, found by scanning `days` for each month's first appearance).
     private func dayLabels(for days: [Date]) -> some View {
         HStack(spacing: 0) {
             switch scale {
@@ -324,16 +363,22 @@ struct MoodDiagramView: View {
                     }
                 }
             case .year:
-                ForEach(0..<12, id: \.self) { monthIdx in
-                    let dayIdx = monthIdx * 30
-                    if dayIdx < days.count {
-                        Text(Self.shortMonthFormatter.string(from: days[min(dayIdx, days.count - 1)]))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                    }
+                ForEach(monthStartDays(in: days), id: \.self) { day in
+                    Text(Self.shortMonthFormatter.string(from: day))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
                 }
             }
+        }
+    }
+
+    /// Scans `days` once and returns the first day of each (year, month) pair that appears, so the year scale labels every calendar month exactly once (up to 13 for a 365-day span).
+    private func monthStartDays(in days: [Date]) -> [Date] {
+        var seen = Set<Int>()
+        return days.filter { day in
+            let c = calendar.dateComponents([.year, .month], from: day)
+            return seen.insert((c.year ?? 0) * 12 + (c.month ?? 0)).inserted
         }
     }
 

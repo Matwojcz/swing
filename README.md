@@ -157,13 +157,6 @@ mcp-server/                  Python MCP server (reads/writes the same SQLite fil
 project.yml                  XcodeGen spec
 ```
 
-## Naming
-
-The app, repo and generated Xcode project are called **Swing**, but the source
-folder (`Sources/MoodBattery`) and the database location (`~/Library/Application
-Support/MoodBattery/`) keep the original *MoodBattery* name. This is
-deliberate: renaming either would move the database and orphan existing data.
-
 ## License
 
 [MIT](LICENSE)

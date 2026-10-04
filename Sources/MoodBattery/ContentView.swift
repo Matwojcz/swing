@@ -52,7 +52,7 @@ struct ContentView: View {
                                 isDetailPanelShown = false
                             }
                         }
-                    }, scrollToDate: diagramScrollDate)
+                    }, scrollToDate: diagramScrollDate, highlightedEntry: selectedEntry)
                     .padding(.horizontal, 16)
                 }
 

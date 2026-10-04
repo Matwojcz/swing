@@ -21,8 +21,19 @@ struct MoodEntryStore {
 
     /// Returns all mood entries ordered by timestamp descending (newest first).
     func fetchAll() throws -> [MoodEntry] {
-        try dbQueue.read { db in
-            try MoodEntry.order(Column("timestamp").desc).fetchAll(db)
+        try dbQueue.write { db in
+            try Self.backfillLocalDates(db)
+            return try MoodEntry.order(Column("timestamp").desc).fetchAll(db)
+        }
+    }
+
+    /// Fills in `localDate` for rows that lack it (legacy rows, or rows inserted straight into SQLite),
+    /// using the day of their timestamp in the current time zone.
+    static func backfillLocalDates(_ db: Database) throws {
+        let missing = try MoodEntry.filter(Column("localDate") == "").fetchAll(db)
+        for var entry in missing {
+            entry.localDate = MoodEntry.localDateString(for: entry.timestamp)
+            try entry.update(db)
         }
     }
 
@@ -33,15 +44,12 @@ struct MoodEntryStore {
         }
     }
 
-    /// Checks whether an entry already exists for the given calendar day.
+    /// Checks whether an entry already exists for the given calendar day (matched on the stored `localDate`, not on UTC timestamps).
     func hasEntry(on date: Date) throws -> Bool {
-        let cal = Calendar.current
-        let start = cal.startOfDay(for: date)
-        let end = cal.date(byAdding: .day, value: 1, to: start)!
-        return try dbQueue.read { db in
-            try MoodEntry
-                .filter(Column("timestamp") >= start && Column("timestamp") < end)
-                .fetchCount(db) > 0
+        let day = MoodEntry.localDateString(for: date)
+        return try dbQueue.write { db in
+            try Self.backfillLocalDates(db)
+            return try MoodEntry.filter(Column("localDate") == day).fetchCount(db) > 0
         }
     }
 

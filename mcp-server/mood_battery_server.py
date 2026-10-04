@@ -46,7 +46,24 @@ def get_db() -> sqlite3.Connection:
     """Opens a connection to the Swing SQLite database with row-factory enabled."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    columns = [r["name"] for r in conn.execute("PRAGMA table_info(moodEntry)")]
+    if "localDate" not in columns:
+        conn.close()
+        raise RuntimeError(
+            "The Swing database has no localDate column yet — open the Swing app once to migrate it."
+        )
     return conn
+
+
+def local_date_for(timestamp: str | None) -> str:
+    """Returns the calendar day (YYYY-MM-DD) an entry belongs to.
+
+    With an explicit timestamp the day is taken as written, so "2026-10-25T23:00:00" belongs to
+    25 Oct whatever the time zone. Without one, it is today's date in the machine's local zone.
+    """
+    if timestamp:
+        return timestamp[:10]
+    return datetime.now().astimezone().strftime("%Y-%m-%d")
 
 
 def row_to_dict(row: sqlite3.Row) -> dict:
@@ -58,12 +75,13 @@ def row_to_dict(row: sqlite3.Row) -> dict:
         "title": row["title"],
         "note": row["note"],
         "timestamp": row["timestamp"],
+        "localDate": row["localDate"],
     }
 
 
 def format_entry(entry: dict) -> str:
     """Formats a mood entry dict into a multi-line string for display, truncating long notes."""
-    parts = [f"[{entry['id']}] {entry['timestamp']}"]
+    parts = [f"[{entry['id']}] {entry['localDate'] or '?'} · {entry['timestamp']}"]
     parts.append(f"  Mood: {entry['mood']:.1f}, Flavour: {entry['flavour']:.2f}")
     if entry["title"]:
         parts.append(f"  Title: {entry['title']}")
@@ -90,7 +108,8 @@ def save_mood_entry(
         flavour: Mood flavour 0.0–1.0 (0=happy/euphoric, 1=irritable/agitated; matters above baseline)
         title: Short mood summary, 2–4 words (e.g. "rough morning", "elevated")
         note: Longer diary text
-        timestamp: ISO 8601 timestamp; defaults to now
+        timestamp: ISO 8601 timestamp; defaults to now. The entry's day is the date as written
+            (e.g. 2026-10-25T23:00:00 is 25 Oct); with no timestamp it is today in local time.
     """
     if not 0 <= mood <= 10:
         return "Error: mood must be 0–10"
@@ -104,8 +123,8 @@ def save_mood_entry(
 
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO moodEntry (mood, flavour, title, note, timestamp) VALUES (?, ?, ?, ?, ?)",
-        (mood, flavour, title, note, ts),
+        "INSERT INTO moodEntry (mood, flavour, title, note, timestamp, localDate) VALUES (?, ?, ?, ?, ?, ?)",
+        (mood, flavour, title, note, ts, local_date_for(timestamp)),
     )
     db.commit()
     entry_id = cursor.lastrowid
@@ -130,7 +149,7 @@ def update_mood_entry(
         flavour: New flavour 0.0–1.0
         title: New title
         note: New note text
-        timestamp: New ISO 8601 timestamp
+        timestamp: New ISO 8601 timestamp (also resets the entry's day to the date as written)
     """
     db = get_db()
     row = db.execute("SELECT * FROM moodEntry WHERE id = ?", (entry_id,)).fetchone()
@@ -155,6 +174,7 @@ def update_mood_entry(
         updates["note"] = note
     if timestamp is not None:
         updates["timestamp"] = timestamp
+        updates["localDate"] = local_date_for(timestamp)
 
     if not updates:
         db.close()
@@ -207,6 +227,7 @@ def get_entry(entry_id: int) -> str:
 
     entry = row_to_dict(row)
     parts = [f"Entry #{entry['id']}"]
+    parts.append(f"Day: {entry['localDate'] or '(not set)'}")
     parts.append(f"Timestamp: {entry['timestamp']}")
     parts.append(f"Mood: {entry['mood']:.1f}")
     parts.append(f"Flavour: {entry['flavour']:.2f}")
@@ -265,7 +286,7 @@ def entries_for_date(date: str) -> str:
     """
     db = get_db()
     rows = db.execute(
-        "SELECT * FROM moodEntry WHERE date(timestamp) = ? ORDER BY timestamp",
+        "SELECT * FROM moodEntry WHERE localDate = ? ORDER BY timestamp",
         (date,),
     ).fetchall()
     db.close()
@@ -286,7 +307,7 @@ def mood_summary(days: int = 7) -> str:
     """
     db = get_db()
     rows = db.execute(
-        "SELECT * FROM moodEntry WHERE timestamp >= datetime('now', ?) ORDER BY timestamp",
+        "SELECT * FROM moodEntry WHERE localDate >= date('now', 'localtime', ?) ORDER BY timestamp",
         (f"-{days} days",),
     ).fetchall()
     db.close()

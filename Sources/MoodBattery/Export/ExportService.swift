@@ -5,7 +5,7 @@ import Foundation
 enum ExportService {
     /// Builds a CSV representation with a header row and ISO-8601 timestamps.
     static func csv(from entries: [MoodEntry]) -> String {
-        let header = "id,mood,flavour,title,note,timestamp"
+        let header = "id,mood,flavour,title,note,timestamp,localDate"
         let rows = entries.map { e in
             let fields: [String] = [
                 e.id.map(String.init) ?? "",
@@ -13,7 +13,8 @@ enum ExportService {
                 String(e.flavour),
                 csvEscape(e.title ?? ""),
                 csvEscape(e.note ?? ""),
-                iso8601Formatter.string(from: e.timestamp)
+                iso8601Formatter.string(from: e.timestamp),
+                e.localDate
             ]
             return fields.joined(separator: ",")
         }

@@ -26,19 +26,23 @@ your mood over time across week, month, and year scales.
   (calm to irritable), add a title and note, save to local database.
 - **History list** — scrollable, mood-colored entries with Dock-style
   magnification on hover and liquid glass effects (macOS 26+).
-- **Mood diagram** — energy over time with mood-colored line. Week, month,
+- **Mood diagram** — mood over time with a mood-colored line. Week, month,
   and year scales with pinch-to-zoom, paging, and continuous lines across
-  page boundaries.
+  page boundaries. The year scale shows weekly averages. Detected mood
+  episodes (sustained depressive or elevated stretches) appear as tinted
+  bands behind the line.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, or note). Delete entries here.
-- **Keyboard navigation** — arrow keys to flick through entries in the
-  detail panel, ESC to close or cancel an edit. Selecting an entry scrolls
-  the diagram to its week.
+- **Keyboard navigation** — up/down arrows flick through entries, ESC
+  closes the detail panel or cancels an edit. The selected entry is shown
+  on the gauge, the diagram scrolls to its week, and its dot gets a ring
+  that fades between entries.
 - **Retrospective entries** — tap an empty date in the week diagram to log
   for a past day. One entry per day is enforced.
 - **Markdown import** — import `.md` diary files with a preview sheet.
   Parses dates and mood/flavour from fields or text sentiment.
-- **Data export** — export all entries as CSV or JSON.
+- **Data export** — export all entries as CSV or JSON from the toolbar menu,
+  which also has dummy-data seeding and "Clear all entries" for development.
 - **MCP server** — Python server for Claude integration (log, query,
   update, delete entries).
 
@@ -146,8 +150,19 @@ Sources/MoodBattery/
   Weekly/                    Mood diagram (week/month/year)
   Persistence/               SQLite store, database manager
   Import/                    Markdown diary importer
-  Models/                    MoodEntry data model
+  Export/                    CSV and JSON export
+  Models/                    MoodEntry, mood scale, episode detection,
+                             per-day/week aggregation
+mcp-server/                  Python MCP server (reads/writes the same SQLite file)
+project.yml                  XcodeGen spec
 ```
+
+## Naming
+
+The app, repo and generated Xcode project are called **Swing**, but the source
+folder (`Sources/MoodBattery`) and the database location (`~/Library/Application
+Support/MoodBattery/`) keep the original *MoodBattery* name. This is
+deliberate: renaming either would move the database and orphan existing data.
 
 ## License
 

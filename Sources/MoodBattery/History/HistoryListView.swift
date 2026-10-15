@@ -6,6 +6,8 @@ struct HistoryListView: View {
     var onSelect: ((MoodEntry) -> Void)?
     var onDelete: ((MoodEntry) -> Void)?
     var scrollToEntry: MoodEntry?
+    /// Shown when `entries` is empty (e.g. "No matches" while searching).
+    var emptyMessage = "No entries yet"
 
     @State private var hoverLocation: CGPoint?
     @State private var isHovering = false
@@ -16,7 +18,7 @@ struct HistoryListView: View {
     var body: some View {
         Group {
             if entries.isEmpty {
-                Text("No entries yet")
+                Text(emptyMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -46,10 +46,15 @@ struct MoodEntryEditor: View {
                 }
 
                 VStack(spacing: headerGaugeSpacing) {
-                    Text(flavourLabel)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 50, height: headerHeight, alignment: .bottom)
+                    VStack(spacing: 2) {
+                        Text(flavourLabel)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Text(String(format: "%.2f", displayFlavour))
+                            .font(.system(size: 15, weight: .medium))
+                            .monospacedDigit()
+                    }
+                    .frame(width: 50, height: headerHeight, alignment: .bottom)
 
                     flavourTrack
                 }

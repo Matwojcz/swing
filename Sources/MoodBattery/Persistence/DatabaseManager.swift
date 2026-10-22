@@ -24,7 +24,11 @@ final class DatabaseManager {
             dbPath = directoryURL.appendingPathComponent("moodbattery.sqlite").path
         }
 
-        dbQueue = try DatabaseQueue(path: dbPath)
+        var configuration = Configuration()
+        configuration.prepareDatabase { db in
+            db.add(function: MoodEntryStore.containsFunction)
+        }
+        dbQueue = try DatabaseQueue(path: dbPath, configuration: configuration)
         try Self.migrator.migrate(dbQueue)
     }
 

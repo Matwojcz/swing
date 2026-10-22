@@ -1,22 +1,31 @@
 import Foundation
 
-/// Free-text search over diary entries. Pure domain logic — no dependencies on views or persistence.
+/// Free-text search rules shared by the database query and the detail-panel highlighting, so what
+/// is found is exactly what gets highlighted. Pure domain logic — no views, no persistence.
 enum EntrySearch {
+    /// Case and accent-insensitive comparison used everywhere.
+    private static let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+
     /// Splits a query into its whitespace-separated words; an empty result means "not searching".
     static func words(in query: String) -> [String] {
         query.split(whereSeparator: \.isWhitespace).map(String.init)
     }
 
-    /// Returns the entries whose title and note together contain every word of `query`,
-    /// ignoring case and accents, in their original order. An empty query matches nothing.
-    static func matches(_ entries: [MoodEntry], query: String) -> [MoodEntry] {
-        let terms = words(in: query)
-        guard !terms.isEmpty else { return [] }
-        return entries.filter { entry in
-            let text = [entry.title, entry.note].compactMap { $0 }.joined(separator: "\n")
-            return terms.allSatisfy {
-                text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    /// Whether `text` contains `term`, ignoring case and accents.
+    static func contains(_ text: String, term: String) -> Bool {
+        text.range(of: term, options: options) != nil
+    }
+
+    /// Every occurrence of every term in `text`, for highlighting. Ranges may overlap when terms do.
+    static func ranges(of terms: [String], in text: String) -> [Range<String.Index>] {
+        var result: [Range<String.Index>] = []
+        for term in terms where !term.isEmpty {
+            var searchRange = text.startIndex..<text.endIndex
+            while let found = text.range(of: term, options: options, range: searchRange) {
+                result.append(found)
+                searchRange = found.upperBound..<text.endIndex
             }
         }
+        return result
     }
 }

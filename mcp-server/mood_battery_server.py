@@ -30,7 +30,7 @@ DB_PATH = os.path.expanduser(
 mcp = FastMCP(
     "swing",
     instructions=(
-        "Swing is a bipolar mood tracker. Mood ranges 0–10 in 0.5 steps "
+        "Swing is a bipolar mood tracker. Mood ranges 0–10 (0.1 precision) "
         "(0 = deep depressive, 5 = baseline, 10 = peak hype). "
         "Flavour ranges 0.0–1.0 (0 = calm, 0.5 = normal, 1 = irritable; "
         "only meaningful above baseline). "
@@ -104,7 +104,7 @@ def save_mood_entry(
     """Save a new mood entry.
 
     Args:
-        mood: Mood level 0–10 in 0.5 steps (0=depressive floor, 5=baseline, 10=peak hype)
+        mood: Mood level 0–10, 0.1 precision (0=depressive floor, 5=baseline, 10=peak hype)
         flavour: Mood flavour 0.0–1.0 (0=happy/euphoric, 1=irritable/agitated; matters above baseline)
         title: Short mood summary, 2–4 words (e.g. "rough morning", "elevated")
         note: Longer diary text

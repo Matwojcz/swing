@@ -14,13 +14,13 @@ struct ContentView: View {
     @State private var retroDate: Date?
     @State private var diagramScrollDate: Date?
     @State private var searchText = ""
+    @State private var searchMatches: [MoodEntry] = []
     @FocusState private var mainFocused: Bool
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
 
     private var isSearching: Bool { !EntrySearch.words(in: searchText).isEmpty }
-    private var searchMatches: [MoodEntry] { EntrySearch.matches(entries, query: searchText) }
     /// The entries the list and keyboard navigation work on: the search matches while searching, otherwise everything.
     private var visibleEntries: [MoodEntry] { isSearching ? searchMatches : entries }
 
@@ -74,7 +74,7 @@ struct ContentView: View {
                             closeDetailPanel()
                         }
 
-                    EntryDetailPanel(entry: entry, onClose: {
+                    EntryDetailPanel(entry: entry, highlightTerms: isSearching ? EntrySearch.words(in: searchText) : [], onClose: {
                         closeDetailPanel()
                     }, onDelete: {
                         try? store.delete(entry)
@@ -169,6 +169,7 @@ struct ContentView: View {
             mainFocused = true
         }
         .searchable(text: $searchText, prompt: "Search titles and notes")
+        .onChange(of: searchText) { runSearch() }
         .onSubmit(of: .search) {
             // Return in the search field jumps to the newest match.
             guard let first = searchMatches.first else { return }
@@ -229,6 +230,12 @@ struct ContentView: View {
     /// Refreshes the entries array from the database.
     private func reload() {
         entries = (try? store.fetchAll()) ?? []
+        runSearch()
+    }
+
+    /// Re-queries the database for the current search text (clearing the matches when not searching).
+    private func runSearch() {
+        searchMatches = isSearching ? ((try? store.search(searchText)) ?? []) : []
     }
 
     /// Processes selected markdown files, parsing diary entries and opening the import preview sheet.

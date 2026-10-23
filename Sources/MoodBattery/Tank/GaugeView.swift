@@ -150,7 +150,7 @@ struct GaugeView: View {
 
     // MARK: - Drag
 
-    /// Creates a drag gesture that maps touch/cursor position to a mood value snapped to half-point steps.
+    /// Creates a drag gesture that maps touch/cursor position to a mood value snapped to `MoodScale.step` (0.1) increments.
     private func dragGesture(_ onMoodChange: @escaping (Double) -> Void) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
@@ -161,7 +161,8 @@ struct GaugeView: View {
                     angleDeg = dx >= 0 ? 0 : 180
                 }
                 let raw = (180 - angleDeg) / 180 * MoodScale.max
-                let snapped = (raw / MoodScale.step).rounded() * MoodScale.step
+                // Round to 2 decimals after snapping so 3 * 0.1 doesn't leave 0.30000000000000004 in the database.
+                let snapped = ((raw / MoodScale.step).rounded() * MoodScale.step * 100).rounded() / 100
                 onMoodChange(snapped)
             }
     }

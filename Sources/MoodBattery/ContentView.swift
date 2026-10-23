@@ -13,10 +13,16 @@ struct ContentView: View {
     @State private var showClearConfirmation = false
     @State private var retroDate: Date?
     @State private var diagramScrollDate: Date?
+    @State private var searchText = ""
+    @State private var searchMatches: [MoodEntry] = []
     @FocusState private var mainFocused: Bool
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
+
+    private var isSearching: Bool { !EntrySearch.words(in: searchText).isEmpty }
+    /// The entries the list and keyboard navigation work on: the search matches while searching, otherwise everything.
+    private var visibleEntries: [MoodEntry] { isSearching ? searchMatches : entries }
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -38,7 +44,11 @@ struct ContentView: View {
                     }, previewEntry: selectedEntry)
                     MoodDiagramView(entries: entries, onSelectDate: { date in
                         let cal = Calendar.current
-                        if let entry = entries.first(where: { $0.day(in: cal) == cal.startOfDay(for: date) }) {
+                        let day = cal.startOfDay(for: date)
+                        // Prefer a matching entry when searching, so tapping a marked day opens the diary that matched.
+                        let tapped = visibleEntries.first(where: { $0.day(in: cal) == day })
+                            ?? entries.first(where: { $0.day(in: cal) == day })
+                        if let entry = tapped {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selectedEntry = entry
                                 isDetailPanelShown = true
@@ -52,7 +62,8 @@ struct ContentView: View {
                                 isDetailPanelShown = false
                             }
                         }
-                    }, scrollToDate: diagramScrollDate, highlightedEntry: selectedEntry)
+                    }, scrollToDate: diagramScrollDate, highlightedEntry: selectedEntry,
+                    searchMatches: isSearching ? searchMatches : nil)
                     .padding(.horizontal, 16)
                 }
 
@@ -63,7 +74,7 @@ struct ContentView: View {
                             closeDetailPanel()
                         }
 
-                    EntryDetailPanel(entry: entry, onClose: {
+                    EntryDetailPanel(entry: entry, highlightTerms: isSearching ? EntrySearch.words(in: searchText) : [], onClose: {
                         closeDetailPanel()
                     }, onDelete: {
                         try? store.delete(entry)
@@ -87,8 +98,14 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            VStack(spacing: 8) {
+            if isSearching {
+                Text(searchMatches.count == 1 ? "1 matching entry" : "\(searchMatches.count) matching entries")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             HistoryListView(
-                entries: entries,
+                entries: visibleEntries,
                 selectedEntry: selectedEntry,
                 onSelect: { entry in
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -105,9 +122,11 @@ struct ContentView: View {
                     }
                     reload()
                 },
-                scrollToEntry: scrollToEntry
+                scrollToEntry: scrollToEntry,
+                emptyMessage: isSearching ? "No matches" : "No entries yet"
             )
             .frame(maxHeight: .infinity)
+            }
             .frame(width: 280)
         }
         .padding(.vertical, 16)
@@ -148,6 +167,17 @@ struct ContentView: View {
         .onAppear {
             reload()
             mainFocused = true
+        }
+        .searchable(text: $searchText, prompt: "Search titles and notes")
+        .onChange(of: searchText) { runSearch() }
+        .onSubmit(of: .search) {
+            // Return in the search field jumps to the newest match.
+            guard let first = searchMatches.first else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                selectedEntry = first
+                scrollToEntry = first
+                diagramScrollDate = first.timestamp
+            }
         }
         .toolbar {
             ToolbarItem {
@@ -200,6 +230,12 @@ struct ContentView: View {
     /// Refreshes the entries array from the database.
     private func reload() {
         entries = (try? store.fetchAll()) ?? []
+        runSearch()
+    }
+
+    /// Re-queries the database for the current search text (clearing the matches when not searching).
+    private func runSearch() {
+        searchMatches = isSearching ? ((try? store.search(searchText)) ?? []) : []
     }
 
     /// Processes selected markdown files, parsing diary entries and opening the import preview sheet.
@@ -255,15 +291,16 @@ struct ContentView: View {
 
     /// Moves the selection to the previous (-1) or next (+1) entry in the list; selects the first entry if none is selected yet.
     private func navigateEntry(direction: Int) {
-        guard !entries.isEmpty else { return }
+        let list = visibleEntries
+        guard !list.isEmpty else { return }
         let next: MoodEntry
         if let current = selectedEntry,
-           let idx = entries.firstIndex(where: { $0.id == current.id }) {
+           let idx = list.firstIndex(where: { $0.id == current.id }) {
             let newIdx = idx + direction
-            guard entries.indices.contains(newIdx) else { return }
-            next = entries[newIdx]
+            guard list.indices.contains(newIdx) else { return }
+            next = list[newIdx]
         } else {
-            next = entries[0]
+            next = list[0]
         }
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedEntry = next

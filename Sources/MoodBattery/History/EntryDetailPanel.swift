@@ -2,6 +2,8 @@ import SwiftUI
 
 struct EntryDetailPanel: View {
     let entry: MoodEntry
+    /// Search words to highlight in the title and note (empty when not searching).
+    var highlightTerms: [String] = []
     var onClose: () -> Void
     var onDelete: (() -> Void)?
     var onUpdate: ((MoodEntry) -> Void)?
@@ -182,7 +184,7 @@ struct EntryDetailPanel: View {
             .padding(.vertical, 2)
             .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.tankSurface))
         } else {
-            Text("Flavour \(flavourLabel)")
+            Text("Flavour \(flavourLabel) · \(String(format: "%.2f", entry.flavour))")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .onTapGesture(count: 2) {
@@ -205,7 +207,7 @@ struct EntryDetailPanel: View {
                 .onSubmit { commitTitle() }
                 .onExitCommand { editingField = nil }
         } else if !title.isEmpty {
-            Text(title)
+            Text(highlighted(title))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -251,7 +253,7 @@ struct EntryDetailPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !note.isEmpty {
-            Text(note)
+            Text(highlighted(note))
                 .font(.system(size: 13))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -270,6 +272,17 @@ struct EntryDetailPanel: View {
                     editingField = .note
                 }
         }
+    }
+
+    /// Returns `text` with every occurrence of the search words given a highlight background.
+    private func highlighted(_ text: String) -> AttributedString {
+        var attributed = AttributedString(text)
+        for range in EntrySearch.ranges(of: highlightTerms, in: text) {
+            if let target = Range(range, in: attributed) {
+                attributed[target].backgroundColor = .yellow.opacity(0.35)
+            }
+        }
+        return attributed
     }
 
     // MARK: - Commit

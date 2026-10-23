@@ -4,7 +4,7 @@ enum MoodScale {
     static let min: Double = 0
     static let max: Double = 10
     static let baseline: Double = 5
-    static let step: Double = 0.5
+    static let step: Double = 0.1
     static let range: ClosedRange<Double> = min...max
     static let redline: Double = 8.8
     static let episodeDepressiveThreshold: Double = 3.5

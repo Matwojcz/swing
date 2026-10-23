@@ -9,7 +9,7 @@ hype, baseline) rather than euphemisms.
 ## How it works
 
 A semicircular gauge is the main interaction. Drag the needle to set your
-energy level (0-10, half-point steps):
+energy level (0-10, in 0.1 steps):
 
 - The arc sweeps from black (depressive floor) through purple, up to blue
   at baseline (5), then through green into gold/orange or red/magenta above.
@@ -46,6 +46,12 @@ your mood over time across week, month, and year scales.
   for a past day. One entry per day is enforced.
 - **Markdown import** — import `.md` diary files with a preview sheet.
   Parses dates and mood/flavour from fields or text sentiment.
+- **Search** — type words in the toolbar search field to find diary entries
+  by title or note (case and accent-insensitive, all words must match). The
+  database is searched, matching dots on the diagram get a ring while the rest
+  dim, the history list narrows to the matches, and the matched words are
+  highlighted in the detail panel. Up/down arrows step through the matches,
+  Return jumps to the newest one.
 - **Data export** — export all entries as CSV or JSON from the toolbar menu,
   which also has dummy-data seeding and "Clear all entries" for development.
 - **MCP server** — Python server for Claude integration (log, query,
@@ -86,7 +92,7 @@ table `moodEntry`, migrated by GRDB on launch:
 | Column      | Type     | Notes                                                    |
 |-------------|----------|----------------------------------------------------------|
 | `id`        | integer  | Auto-incremented primary key                             |
-| `mood`      | double   | 0-10 in 0.5 steps, baseline 5                            |
+| `mood`      | double   | 0-10 in 0.1 steps, baseline 5                            |
 | `flavour`   | double   | 0-1, calm (0) to irritable (1)                           |
 | `title`     | text     | Optional short summary                                   |
 | `note`      | text     | Optional diary text                                      |

@@ -22,6 +22,8 @@ struct MoodDiagramView: View {
     var scrollToDate: Date?
     /// The entry currently selected elsewhere in the app; its dot (or, on the year scale, its week's dot) gets a mood-coloured ring that fades in and out as the selection changes.
     var highlightedEntry: MoodEntry?
+    /// Entries matching the current search: nil when not searching. While searching, the line and dots are dimmed and every dot (or, on the year scale, week dot) holding a match gets a white ring.
+    var searchMatches: [MoodEntry]?
 
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
@@ -140,6 +142,14 @@ struct MoodDiagramView: View {
                         drawSeries(drawingPoints, in: context, size: size,
                                    dotRange: 0..<scale.dayCount)
                     }
+                    .opacity(searchMatches == nil ? 1 : 0.4)
+
+                    GeometryReader { geo in
+                        ForEach(matchedPoints(in: tappablePoints, days: days), id: \.dayIndex) { point in
+                            searchRing(for: point, in: geo.size)
+                        }
+                    }
+                    .allowsHitTesting(false)
 
                     GeometryReader { geo in
                         if let point = highlightedPoint(in: tappablePoints, days: days) {
@@ -216,6 +226,29 @@ struct MoodDiagramView: View {
             return points.first { $0.dayIndex == midIdx }
         }
         return points.first { calendar.startOfDay(for: $0.date) == day }
+    }
+
+    /// Returns the plotted points on this page that hold a search match: the point's own day on week/month scales, or any day of its 7-day chunk on the year scale.
+    private func matchedPoints(in points: [MoodDataAggregator.DataPoint], days: [Date]) -> [MoodDataAggregator.DataPoint] {
+        guard let matches = searchMatches, !matches.isEmpty else { return [] }
+        let matchDays = Set(matches.map { $0.day(in: calendar) })
+        return points.filter { point in
+            if scale == .year {
+                let chunk = (point.dayIndex - 3)...(point.dayIndex + 3)
+                return chunk.contains { days.indices.contains($0) && matchDays.contains(days[$0]) }
+            }
+            return matchDays.contains(calendar.startOfDay(for: point.date))
+        }
+    }
+
+    /// Draws a thin white ring around a point that holds a search match.
+    private func searchRing(for point: MoodDataAggregator.DataPoint, in size: CGSize) -> some View {
+        let ringRadius = (scale == .year ? 3.0 : dotRadius) + 3
+        return Circle()
+            .stroke(Color.white.opacity(0.9), lineWidth: 1.5)
+            .frame(width: ringRadius * 2, height: ringRadius * 2)
+            .position(x: x(forDayIndex: point.dayIndex, totalDays: scale.dayCount, width: size.width),
+                      y: y(for: point.mood, height: size.height))
     }
 
     /// Draws a soft halo and ring around a point, coloured like the point itself. Inserted/removed with an opacity transition so it crossfades between dots when the selection moves.

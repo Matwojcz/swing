@@ -106,7 +106,6 @@ struct ContentView: View {
             }
             HistoryListView(
                 entries: visibleEntries,
-                emptyMessage: isSearching ? "No matches" : "No entries yet",
                 selectedEntry: selectedEntry,
                 onSelect: { entry in
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -123,7 +122,8 @@ struct ContentView: View {
                     }
                     reload()
                 },
-                scrollToEntry: scrollToEntry
+                scrollToEntry: scrollToEntry,
+                emptyMessage: isSearching ? "No matches" : "No entries yet"
             )
             .frame(maxHeight: .infinity)
             }

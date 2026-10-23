@@ -48,6 +48,33 @@ safety framing). Two commitments sit above the technical detail:
    fails, the app works exactly as it does today; literal search still works.
 6. **Reversible & transparent** — tags are derived data. The user can see
    them, a "reclassify all" exists, and raw entries are never modified by it.
+7. **Neutral core, optional lenses** — out of the box the app is a general
+   mood tracker that implies no diagnosis. Condition-specific framing is
+   opt-in (see §4a).
+
+## 4a. Product direction: neutral core & lenses
+
+The app is becoming something that may be shared freely with people across
+different conditions (bipolar I/II, cyclothymia, BPD, PMDD, MDD, or no
+diagnosis at all). To serve all of them without fragmenting into separate
+per-condition apps:
+
+- **Neutral core (default, out of the box).** Log mood on the existing 0–10
+  scale + flavour axis, add notes, get AI tags. Neutral wording, no diagnosis
+  implied. This is what every new user sees.
+- **Lenses (opt-in, later — once settings exist).** A switch in settings turns
+  on a lens that reframes the *same data* for a user's situation. The first is
+  a **Bipolar lens**: it brings back the blunt direct language
+  ("depressive / elevated") and the episode bands. Future lenses could frame
+  the same data other ways. One app, neutral by default, depth on request.
+- **The scale stays 0–10.** We do **not** widen it for mania. Instead mania
+  becomes a new **detection tier inside the Bipolar lens** (the tier we
+  deferred earlier — e.g. a ≥7-day elevated run, or a user-flagged
+  hospitalisation — distinct from the 4-day hypomania tier). Keeping 0–10
+  keeps all existing data valid.
+- **Tags do the cross-condition work.** Tags describe *states as written*
+  (anxious, numb, irritable, elevated…), not diagnoses, so one simple scale
+  plus multi-tagging covers very different conditions without special-casing.
 
 ## 4. Runtime & model (decided)
 
@@ -71,12 +98,29 @@ safety framing). Two commitments sit above the technical detail:
   confidence. Produced via constrained/structured generation so the model
   can only return valid tags (grammar-constrained decoding in llama.cpp, or
   parse-and-validate against the vocabulary).
-- **Taxonomy (SEED — needs the user's real vocabulary):**
-  `low, flat, numb, anxious, irritable, overwhelmed, restless, hopeful,
-  calm, content, energised, elevated, foggy, tired, lonely`.
-  This is a placeholder. The real set should come from words the user
-  actually uses, and be reviewed with the therapist. The vocabulary lives in
-  one place in code (a `MoodTag` enum / list) so it is easy to revise.
+- **Taxonomy (DRAFT base set — to be finalised, see below):** spans more than
+  the sad↔happy axis so irritable/anxious states (which the flavour axis
+  already represents) are covered. Working clusters:
+  - *Low / down:* `low, flat, depressed, numb, empty, hopeless`
+  - *Neutral / settled:* `normal, calm, content`
+  - *Up / positive:* `happy, hopeful, energised, euphoric`
+  - *Irritable / angry:* `irritable, frustrated, angry, agitated`
+  - *Anxious / activated:* `anxious, restless, overwhelmed, on edge`
+  - *Depleted / foggy:* `tired, drained, foggy`
+
+  ~22 tags — about the right ceiling for model consistency. Lives in one place
+  in code (a `MoodTag` enum / list) so it is easy to revise. Multi-tag per
+  entry by design ("wired but low" → `restless` + `low` + `anxious`).
+- **Three taxonomy decisions deferred to a NEXT version — revisit once the LLM
+  is working as it should, and review with the therapist:**
+  1. Keep clinical-leaning words (`depressed`, `euphoric`) in the neutral base,
+     or move them to the Bipolar lens and use `down` / `elated` in the core.
+  2. Feelings-only vocabulary, or add a separate *context* tag type
+     (poor sleep, argument, good session…) as its own dimension — not mixed in.
+  3. Confirm multi-tag per entry and whether to store per-tag confidence.
+
+  (These were discussed and intentionally parked so the first build focuses on
+  getting local inference working, not on perfecting the word list.)
 - **Prompt:** a fixed system instruction describing the task and the allowed
   tags, kept in the repo and versioned.
 
@@ -139,6 +183,41 @@ Reuses the search UI from `feature/search` with minimal change:
 - **Licence hygiene:** ship Qwen's Apache-2.0 licence and attribution; audit
   that the chosen Swift/llama.cpp bindings are redistributable too.
 
+## 10a. Smart diary import (later phase, builds on the classifier)
+
+Upgrade the existing Markdown importer so a user can bring in a digitised
+diary of **any layout** — not just the formats the current regex parser
+anticipates. The model does only the fuzzy structural work; everything else
+reuses what already exists.
+
+- **The LLM identifies exactly three things per entry:** where each entry
+  **starts/stops** (segmentation), its **date**, and its **title**. Nothing
+  more.
+- **Content is sliced verbatim** from the source by position — never
+  regenerated or paraphrased — so the model cannot hallucinate or reword
+  someone's actual diary text.
+- **Two kinds of "format" are handled in different layers:**
+  - *Internal structure* (date-first vs date-last, headers, bullet-journal,
+    run-on prose) → the LLM absorbs this; that is the point of using it.
+  - *File/container format* (.txt, .md, .docx, .pdf, exported JSON) → a
+    deterministic adapter layer converts the file to plain text first, then
+    hands that text to the LLM. txt/md are trivial; .docx/.pdf need text
+    extraction via platform APIs, kept behind the same cross-platform
+    boundary as the model so Windows stays a clean port. (Today's importer
+    accepts `.plainText` only — this is where the breadth is added.)
+- **Reuses the existing import *preview* sheet.** The model *proposes* entries;
+  the user reviews and confirms before anything is committed. That existing
+  review step is the safety net that makes LLM import trustworthy, especially
+  for dates (the easiest thing for a small model to get wrong).
+- **Tags + suggested mood** are applied to each isolated entry via the same
+  classifier, adjustable in preview.
+- **Pipeline:** `file → (adapter) → plain text → (LLM: date/title/boundaries)
+  → verbatim slices → existing preview → commit (+ tags)`.
+- **Model note:** extraction is harder than tagging; it may want the 1.5B
+  model even if 0.5B suffices for tags. Settle during the Phase 1 spike.
+- Runs as a slow, resumable background job with progress — acceptable because
+  it is a one-off per imported file.
+
 ## 11. Safety & framing (release gate)
 
 - Keep "reflection, not clinical" framing throughout; label AI tags as
@@ -160,27 +239,42 @@ Reuses the search UI from `feature/search` with minimal change:
 
 ## 13. Open decisions
 
+Settle **before Phase 1** (they gate the first build):
+
 1. **Model size:** Qwen2.5 **0.5B vs 1.5B** — decide by quality-vs-speed test
-   on real entries.
+   on real entries (tagging may be fine on 0.5B; import may want 1.5B).
 2. **Model delivery:** bundle vs first-run download.
-3. **Tag vocabulary:** the real seed list from the user (10–20 words), then a
-   therapist review.
-4. **Confidence:** store per-tag confidence, or tags only?
-5. **Search UX:** visible tag chips/filter vs. tags folded into the one box.
+
+Parked for a **NEXT version — revisit once the LLM works as it should**, and
+review with the therapist (see §5 and §4a):
+
+3. **Final tag vocabulary** — clinical words in core vs lens; feelings-only vs
+   a separate context-tag dimension; multi-tag confirmed; confidence or not.
+4. **Lenses & settings** — the opt-in lens switch and the Bipolar lens
+   (direct language + episode bands + the new **mania detection tier**).
+5. **Search UX** — visible tag chips/filter vs. tags folded into the one box.
 
 ## 14. Phased rollout
 
-- **Phase 0 — Plan & decisions** (this doc): settle §13 items 1–3 at least.
+**Get local inference working first; everything opinionated comes after.**
+
+- **Phase 0 — Plan & decisions** (this doc): settle §13 items 1–2.
 - **Phase 1 — Inference spike:** wire llama.cpp + Qwen behind `EntryClassifier`;
-  prove one note → tags locally. No UI, no DB yet.
+  prove one note → tags locally. No UI, no DB yet. *This is the gate: nothing
+  below is worth finalising until this works.*
 - **Phase 2 — Schema & service:** `tags`/`tagModelVersion` migration,
   classification on save, async queue, failure handling.
 - **Phase 3 — Backfill & reclassify:** one-time pass + "reclassify all".
 - **Phase 4 — Search UX:** tag display in detail panel, tag filtering folded
   into search, exports include tags.
-- **Phase 5 — Hardening:** golden-set tests, resource checks on low-end
+- **Phase 5 — Finalise taxonomy & smart import:** lock the tag vocabulary
+  (§13.3) now that real tagging can be observed; build smart diary import
+  (§10a) on the proven classifier.
+- **Phase 6 — Lenses & mania tier:** settings switch, Bipolar lens (direct
+  language + episode bands + mania detection tier), neutral-core default.
+- **Phase 7 — Hardening:** golden-set tests, resource checks on low-end
   hardware, licence audit.
-- **Phase 6 — Safety review (release gate):** algorithm re-examination +
+- **Phase 8 — Safety review (release gate):** algorithm re-examination +
   therapist review before any public/Windows release.
 
 ## 15. Out of scope (for now)

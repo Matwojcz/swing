@@ -273,8 +273,11 @@ Parked for a **NEXT version — revisit once the LLM works as it should**:
 
 - **Phase 0 — Plan & decisions** (this doc): settle §13 items 1–2.
 - **Phase 1 — Inference spike:** wire llama.cpp + Qwen behind `EntryClassifier`;
-  prove one note → tags locally. No UI, no DB yet. *This is the gate: nothing
-  below is worth finalising until this works.*
+  prove one note → tags locally. No DB yet. *This is the gate: nothing below is
+  worth finalising until this works.* Scaffolding (protocol, taxonomy, prompt +
+  validation, stub classifier, "Tag spike" harness screen) is **built and
+  compiles without the model**; the local model-wiring steps and the gate
+  checklist are in `docs/PHASE1_LLAMA_INTEGRATION.md`.
 - **Phase 2 — Schema & service:** `tags`/`tagModelVersion` migration,
   classification on save, async queue, failure handling.
 - **Phase 3 — Backfill & reclassify:** one-time pass + "reclassify all".

@@ -15,10 +15,13 @@ struct ContentView: View {
     @State private var diagramScrollDate: Date?
     @State private var searchText = ""
     @State private var searchMatches: [MoodEntry] = []
+    @State private var showTagSpike = false
     @FocusState private var mainFocused: Bool
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
+    // Phase 1 spike classifier. Swap for the llama.cpp-backed one to test the real model.
+    private let spikeClassifier: EntryClassifier = KeywordClassifier()
 
     private var isSearching: Bool { !EntrySearch.words(in: searchText).isEmpty }
     /// The entries the list and keyboard navigation work on: the search matches while searching, otherwise everything.
@@ -186,6 +189,11 @@ struct ContentView: View {
                 }
             }
             ToolbarItem {
+                Button(action: { showTagSpike = true }) {
+                    Label("Tag spike", systemImage: "tag")
+                }
+            }
+            ToolbarItem {
                 Menu {
                     Button("Export as CSV") { exportCSV() }
                     Button("Export as JSON") { exportJSON() }
@@ -203,6 +211,9 @@ struct ContentView: View {
             allowsMultipleSelection: true
         ) { result in
             handleFileImport(result)
+        }
+        .sheet(isPresented: $showTagSpike) {
+            TagSpikeView(classifier: spikeClassifier)
         }
         .sheet(isPresented: $showImportPreview) {
             ImportPreviewSheet(

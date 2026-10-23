@@ -94,35 +94,44 @@ per-condition apps:
 
 - **Input:** the entry's title + note (and nothing else; mood number is not
   fed in, to keep tags grounded in what the user *wrote*).
-- **Output:** a subset of a fixed tag vocabulary, plus an optional per-tag
-  confidence. Produced via constrained/structured generation so the model
-  can only return valid tags (grammar-constrained decoding in llama.cpp, or
-  parse-and-validate against the vocabulary).
-- **Taxonomy (DRAFT base set — to be finalised, see below):** spans more than
-  the sad↔happy axis so irritable/anxious states (which the flavour axis
-  already represents) are covered. Working clusters:
-  - *Low / down:* `low, flat, depressed, numb, empty, hopeless`
-  - *Neutral / settled:* `normal, calm, content`
-  - *Up / positive:* `happy, hopeful, energised, euphoric`
-  - *Irritable / angry:* `irritable, frustrated, angry, agitated`
-  - *Anxious / activated:* `anxious, restless, overwhelmed, on edge`
-  - *Depleted / foggy:* `tired, drained, foggy`
+- **Output:** up to **3** tags from a fixed vocabulary — **binary** (present or
+  not; no confidence score, which a small model can't report honestly).
+  Produced via constrained/structured generation so the model can only return
+  valid tags (grammar-constrained decoding in llama.cpp, or parse-and-validate
+  against the vocabulary).
 
-  ~22 tags — about the right ceiling for model consistency. Lives in one place
-  in code (a `MoodTag` enum / list) so it is easy to revise. Multi-tag per
-  entry by design ("wired but low" → `restless` + `low` + `anxious`).
-- **Three taxonomy decisions deferred to a NEXT version — revisit once the LLM
-  is working as it should, and review with the therapist:**
-  1. Keep clinical-leaning words (`depressed`, `euphoric`) in the neutral base,
-     or move them to the Bipolar lens and use `down` / `elated` in the core.
-  2. Feelings-only vocabulary, or add a separate *context* tag type
-     (poor sleep, argument, good session…) as its own dimension — not mixed in.
-  3. Confirm multi-tag per entry and whether to store per-tag confidence.
+### Taxonomy design (decided; wording pending therapist review)
 
-  (These were discussed and intentionally parked so the first build focuses on
-  getting local inference working, not on perfecting the word list.)
-- **Prompt:** a fixed system instruction describing the task and the allowed
-  tags, kept in the repo and versioned.
+Settled choices: **two-dimensional** (valence × arousal, not a single
+sad↔happy line); **multi-label, max 3** per entry; **vernacular** register in
+the core (clinical words live in the Bipolar lens); **medium** size (~20);
+**closed** set (the model may not invent tags); **feelings only** (no context/
+trigger tags yet); **binary** (no confidence).
+
+**Provisional base set — 20 tags, on the valence × arousal grid:**
+
+| valence \\ arousal | low arousal (still)        | high arousal (activated)                        |
+|--------------------|----------------------------|-------------------------------------------------|
+| **low (bad)**      | low, flat, numb, tired, foggy, lonely | anxious, restless, overwhelmed, irritable, frustrated, angry |
+| **high (good)**    | calm, content, rested      | happy, hopeful, energised, excited              |
+| **neutral**        | okay                       |                                                 |
+
+- **Clinical words reserved for the Bipolar lens** (opt-in): `depressed`,
+  `euphoric`, `manic`, `hypomanic`, `dysphoric/mixed`. The blunt no-euphemism
+  language stays available to those who turn the lens on; the neutral core
+  avoids implying diagnosis.
+- **`hopeless` is deliberately held back** from the base: vernacular and common
+  but a weighty, safety-adjacent signal. Decide its handling (core / lens /
+  special treatment) **with the therapist**, not silently.
+- Lives in one place in code (a `MoodTag` enum / list), easy to revise.
+- **Still open for a NEXT version** (parked, revisit once the LLM works): final
+  wording sign-off with the therapist; a separate *context/trigger* tag
+  dimension (poor sleep, argument…) as its own layer, never mixed into these;
+  optional manual personal tags the user applies by hand (the AI stays on the
+  closed set).
+- **Prompt:** a fixed system instruction describing the task, the allowed tags,
+  and the "up to 3 strongest, only if clearly present" rule. Kept in the repo
+  and versioned.
 
 ## 6. Data model changes
 
@@ -245,14 +254,18 @@ Settle **before Phase 1** (they gate the first build):
    on real entries (tagging may be fine on 0.5B; import may want 1.5B).
 2. **Model delivery:** bundle vs first-run download.
 
-Parked for a **NEXT version — revisit once the LLM works as it should**, and
-review with the therapist (see §5 and §4a):
+**Taxonomy shape is now decided** (§5): two-dimensional, multi-label max 3,
+vernacular core, ~20 closed tags, feelings-only, binary. What remains:
 
-3. **Final tag vocabulary** — clinical words in core vs lens; feelings-only vs
-   a separate context-tag dimension; multi-tag confirmed; confidence or not.
-4. **Lenses & settings** — the opt-in lens switch and the Bipolar lens
-   (direct language + episode bands + the new **mania detection tier**).
-5. **Search UX** — visible tag chips/filter vs. tags folded into the one box.
+3. **Wording sign-off with the therapist** — the provisional 20-tag set, and
+   the handling of `hopeless` specifically.
+
+Parked for a **NEXT version — revisit once the LLM works as it should**:
+
+4. **Context/trigger tag dimension** and optional manual personal tags.
+5. **Lenses & settings** — the opt-in lens switch and the Bipolar lens
+   (clinical language + episode bands + the new **mania detection tier**).
+6. **Search UX** — visible tag chips/filter vs. tags folded into the one box.
 
 ## 14. Phased rollout
 

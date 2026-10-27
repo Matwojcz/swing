@@ -90,6 +90,31 @@ per-condition apps:
   LLM.swift / llama.cpp bindings, or a thin C-interop target vendoring
   llama.cpp). Exact binding to be chosen in Phase 1.
 
+## 4b. Model strategy: tiered and task-specific
+
+Tagging/classification/import and open-ended *reflection* are different
+difficulty classes; one model size must not gate both.
+
+- **Core tasks (tags, search, import):** small local model (0.5–1.5B),
+  always-on, private, free. Decided in §4.
+- **Reflection (the "Mirror" feature — see `docs/IDEAS.md`):** a *separate,
+  optional* engine, never the default, offered as tiers:
+  1. **User's own writing only** — no model.
+  2. **Local medium model** (3–4B lean, or 7–8B for quality; Q4 GGUF ~2–5 GB,
+     8 GB RAM floor / 16 GB comfortable) via llama.cpp — decent reflections,
+     fully offline.
+  3. **Bring-your-own API key** to any provider for frontier quality —
+     explicit opt-in, clearly flagged that this feature sends text off-device.
+- **Provider abstraction:** reflection sits behind its own protocol. Cloud
+  providers are reached through **one OpenAI-compatible adapter** (base URL +
+  key + model) with presets, which covers OpenAI, Anthropic-compatible
+  gateways, and many others **including Chinese models** (DeepSeek, Qwen, Kimi,
+  Zhipu) plus a custom-endpoint option — a true "pick your own" with one code
+  path. Keys in the platform keychain, scoped to reflection, never synced.
+- **Cross-platform:** the llama.cpp core and these protocols travel to
+  Windows/Linux; the SwiftUI app does not — a port is a UI re-do, not an engine
+  change (still out of scope for now).
+
 ## 5. The classification contract
 
 - **Input:** the entry's title + note (and nothing else; mood number is not

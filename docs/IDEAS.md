@@ -6,7 +6,9 @@ branches.
 
 ---
 
-## Reflection space — give meaning to a stretch of days
+## Mirror — a reflection space to give meaning to a stretch of days
+
+*(working name: "Mirror" — it reflects your days back at you, not a verdict)*
 
 **What:** a place to step back and reflect on *several days together*, rather
 than one entry at a time.

@@ -1,6 +1,6 @@
 # Swing
 
-**v1.0.5**
+**v1.1.0**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time, using direct language (depressive,

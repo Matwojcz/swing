@@ -5,6 +5,21 @@ struct HistoryEntryRow: View {
 
     @State private var isHovered = false
 
+    private static let chipFontSize: CGFloat = 10
+    private static let spacing: CGFloat = 10
+    private static let horizontalPadding: CGFloat = 12
+    private static let colourBarWidth: CGFloat = 5
+    private static let dateWidth: CGFloat = 28
+
+    /// Narrowest width at which any entry's tags fit on one line: colour bar, date, the widest possible
+    /// chip row and the time, with the spacing and padding between them.
+    static var minimumWidth: CGFloat {
+        let timeWidth: CGFloat = ceil(("00:00" as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11)]).width)
+        let content: CGFloat = colourBarWidth + dateWidth + MoodTagChips.widestRowWidth(fontSize: chipFontSize) + timeWidth
+        let gaps: CGFloat = spacing * 3 + horizontalPadding * 2
+        return content + gaps
+    }
+
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
@@ -35,10 +50,10 @@ struct HistoryEntryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Self.spacing) {
             Capsule()
                 .fill(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
-                .frame(width: 5)
+                .frame(width: Self.colourBarWidth)
 
             VStack(spacing: 1) {
                 Text(Self.dayFormatter.string(from: entry.timestamp))
@@ -47,7 +62,7 @@ struct HistoryEntryRow: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
-            .frame(width: 28)
+            .frame(width: Self.dateWidth)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(displayTitle)
@@ -55,7 +70,7 @@ struct HistoryEntryRow: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 if !entry.moodTags.isEmpty {
-                    MoodTagChips(tags: entry.moodTags, fontSize: 10, compact: true)
+                    MoodTagChips(tags: entry.moodTags, fontSize: Self.chipFontSize)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,7 +80,7 @@ struct HistoryEntryRow: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Self.horizontalPadding)
         .modifier(GlassRowModifier(isHovered: isHovered))
         .onHover { isHovered = $0 }
     }

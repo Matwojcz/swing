@@ -132,7 +132,7 @@ struct ContentView: View {
             )
             .frame(maxHeight: .infinity)
             }
-            .frame(width: 280)
+            .frame(width: max(280, HistoryListView.minimumWidth))
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 20)

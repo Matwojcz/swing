@@ -96,7 +96,7 @@ struct EntryDetailPanel: View {
                     .foregroundStyle(.secondary)
             }
             if !entry.moodTags.isEmpty {
-                MoodTagChips(tags: entry.moodTags, fontSize: 12, compact: true)
+                MoodTagChips(tags: entry.moodTags, fontSize: 12)
                     .padding(.leading, 8)
             }
             Spacer(minLength: 8)

@@ -34,63 +34,32 @@ struct MoodTagChip: View {
     }
 }
 
-/// A row of tag chips. With `compact`, shows as many chips as fit the width and folds the rest into "+N".
+/// A row of tag chips.
 struct MoodTagChips: View {
     let tags: [MoodTag]
     var fontSize: CGFloat = 11
-    var compact = false
-
-    @State private var availableWidth: CGFloat = .infinity
 
     private static let spacing: CGFloat = 4
 
     var body: some View {
-        if compact {
-            let shown = fittingCount(in: availableWidth)
-            row(Array(tags.prefix(shown)), hidden: tags.count - shown)
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
-        } else {
-            row(tags, hidden: 0)
+        HStack(spacing: Self.spacing) {
+            ForEach(tags) { MoodTagChip(tag: $0, fontSize: fontSize) }
         }
     }
 
-    /// How many leading chips fit in `width`, leaving room for the "+N" label when some are left out.
-    /// Measured from text widths rather than by laying out candidate rows, so the row is laid out once.
-    private func fittingCount(in width: CGFloat) -> Int {
-        let chipWidths = tags.map { textWidth($0.rawValue) + fontSize * 1.2 }
-        for shown in stride(from: tags.count, through: 1, by: -1) {
-            let hidden = tags.count - shown
-            var total = chipWidths.prefix(shown).reduce(0, +) + Self.spacing * CGFloat(shown - 1)
-            if hidden > 0 { total += Self.spacing + textWidth("+\(hidden)") }
-            if total <= width { return shown }
-        }
-        return 1
-    }
-
-    private func textWidth(_ text: String) -> CGFloat {
+    /// Width of the widest possible row: the `TagPrompt.maxTags` widest chips in the vocabulary side by side.
+    /// Layouts reserve this so every entry's tags fit without truncating.
+    static func widestRowWidth(fontSize: CGFloat) -> CGFloat {
         let font = NSFont.systemFont(ofSize: fontSize, weight: .medium)
-        return ceil((text as NSString).size(withAttributes: [.font: font]).width)
-    }
-
-    private func row(_ shown: [MoodTag], hidden: Int) -> some View {
-        HStack(spacing: 4) {
-            ForEach(shown) { MoodTagChip(tag: $0, fontSize: fontSize) }
-            if hidden > 0 {
-                Text("+\(hidden)")
-                    .font(.system(size: fontSize, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-            }
-        }
+        let chipWidths = MoodTag.allCases
+            .map { ceil(($0.rawValue as NSString).size(withAttributes: [.font: font]).width) + fontSize * 1.2 }
+            .sorted(by: >)
+        let count = min(TagPrompt.maxTags, chipWidths.count)
+        return chipWidths.prefix(count).reduce(0, +) + spacing * CGFloat(count - 1)
     }
 }
 
 #Preview {
-    VStack(alignment: .leading, spacing: 12) {
-        MoodTagChips(tags: [.flat, .low, .happy, .content])
-        MoodTagChips(tags: [.anxious, .overwhelmed, .calm, .hopeful], fontSize: 10, compact: true)
-            .frame(width: 150, alignment: .leading)
-    }
-    .padding()
+    MoodTagChips(tags: [.overwhelmed, .frustrated, .irritable, .energised], fontSize: 10)
+        .padding()
 }

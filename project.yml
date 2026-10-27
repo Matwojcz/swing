@@ -27,11 +27,18 @@ targets:
         MARKETING_VERSION: "1.1.0"
         CURRENT_PROJECT_VERSION: "6"
         ENABLE_HARDENED_RUNTIME: true
+        # Signing the app and the embedded llama.framework with one team keeps the hardened runtime's
+        # library validation happy; ad-hoc signatures count as different teams and the framework won't load.
+        DEVELOPMENT_TEAM: FKRP65847F
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Development"
         SWIFT_VERSION: "5.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Sources/MoodBattery/Info.plist
       properties:
         CFBundleDisplayName: Swing
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: ""

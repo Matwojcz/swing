@@ -25,9 +25,35 @@ enum MoodTag: String, CaseIterable, Codable, Identifiable, Hashable {
         allCases.map(\.rawValue).joined(separator: ", ")
     }
 
-    /// Case-insensitive lookup from a single raw word the model emitted; nil if not a valid tag.
+    /// Off-list words folded into the nearest tag. The grammar-constrained model can't emit these, so this
+    /// only matters for an unconstrained classifier; avoids filler words ("good", "fine", "down", "normal").
+    static let synonyms: [String: MoodTag] = [
+        "tearful": .low, "teary": .low, "sad": .low, "upset": .low, "crying": .low, "gloomy": .low,
+        "miserable": .low, "hopeless": .low, "depressed": .low, "useless": .low, "worthless": .low,
+        "empty": .flat, "apathetic": .flat, "unmotivated": .flat, "detached": .flat,
+        "exhausted": .tired, "drained": .tired, "fatigued": .tired, "sleepy": .tired,
+        "groggy": .foggy, "confused": .foggy, "unfocused": .foggy,
+        "isolated": .lonely,
+        "worried": .anxious, "nervous": .anxious, "stressed": .anxious, "tense": .anxious,
+        "panicky": .anxious, "scared": .anxious, "afraid": .anxious,
+        "agitated": .restless, "fidgety": .restless,
+        "swamped": .overwhelmed,
+        "annoyed": .irritable, "grumpy": .irritable, "cranky": .irritable, "snappy": .irritable,
+        "furious": .angry,
+        "relaxed": .calm, "peaceful": .calm, "settled": .calm,
+        "satisfied": .content, "grateful": .content,
+        "refreshed": .rested,
+        "joyful": .happy, "cheerful": .happy,
+        "optimistic": .hopeful,
+        "energized": .energised, "energetic": .energised,
+        "thrilled": .excited,
+        "neutral": .okay,
+    ]
+
+    /// Case-insensitive lookup from a single raw word the model emitted: an exact tag, else a known
+    /// synonym, else nil.
     static func from(_ word: String) -> MoodTag? {
         let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return allCases.first { $0.rawValue == trimmed }
+        return MoodTag(rawValue: trimmed) ?? synonyms[trimmed]
     }
 }

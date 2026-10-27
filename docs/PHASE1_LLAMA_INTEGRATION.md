@@ -13,7 +13,7 @@ is: add a dependency, add one file, change one line.
 - `MoodTag` — the closed 20-tag vocabulary.
 - `EntryClassifier` — the protocol everything depends on.
 - `TagPrompt` — builds the system/user prompt and parses + validates the reply
-  down to valid tags, max 3. Model-agnostic.
+  down to valid tags, up to 2 per part of the day (max 4). Model-agnostic.
 - `KeywordClassifier` — dependency-free stub + fallback.
 - `TagSpikeView` — the "paste text → tags" screen, opened from the toolbar
   "Tag spike" button. Wired to `spikeClassifier` in `ContentView`.

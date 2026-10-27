@@ -5,7 +5,7 @@ import Foundation
 /// Its job is to let the pipeline and UI run *before* the llama.cpp model is wired in, and to act
 /// as a graceful fallback if the model is unavailable. It is deliberately dumb — it only catches
 /// literal cues, has no contextual understanding, and will miss paraphrased feelings — but it never
-/// invents tags and respects the max-3 cap, so everything downstream can be built and tested now.
+/// invents tags and respects the `TagPrompt.maxTags` cap, so everything downstream can be built and tested now.
 struct KeywordClassifier: EntryClassifier {
     /// Cue words/phrases that map onto each tag. Checked as plain substrings, lowercased.
     private static let cues: [MoodTag: [String]] = [

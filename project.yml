@@ -7,6 +7,9 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift.git
     from: 7.0.0
+  LLM:
+    url: https://github.com/eastriverlee/LLM.swift
+    from: 3.0.3
 targets:
   Swing:
     type: application
@@ -16,6 +19,8 @@ targets:
     dependencies:
       - package: GRDB
         product: GRDB
+      - package: LLM
+        product: LLM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.matwojcz.Swing

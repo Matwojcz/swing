@@ -20,8 +20,9 @@ struct ContentView: View {
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
-    // Phase 1 spike classifier. Swap for the llama.cpp-backed one to test the real model.
-    private let spikeClassifier: EntryClassifier = KeywordClassifier()
+    private let spikeClassifier: EntryClassifier =
+        (try? LlamaClassifier(modelURL: URL(fileURLWithPath: "/Users/matwojcz/Models/qwen2.5-3b-instruct-q4_k_m.gguf")))
+        ?? KeywordClassifier()
 
     private var isSearching: Bool { !EntrySearch.words(in: searchText).isEmpty }
     /// The entries the list and keyboard navigation work on: the search matches while searching, otherwise everything.
@@ -109,7 +110,6 @@ struct ContentView: View {
             }
             HistoryListView(
                 entries: visibleEntries,
-                emptyMessage: isSearching ? "No matches" : "No entries yet",
                 selectedEntry: selectedEntry,
                 onSelect: { entry in
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -126,7 +126,8 @@ struct ContentView: View {
                     }
                     reload()
                 },
-                scrollToEntry: scrollToEntry
+                scrollToEntry: scrollToEntry,
+                emptyMessage: isSearching ? "No matches" : "No entries yet"
             )
             .frame(maxHeight: .infinity)
             }

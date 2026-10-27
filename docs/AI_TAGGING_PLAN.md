@@ -128,7 +128,8 @@ difficulty classes; one model size must not gate both.
 ### Taxonomy design (decided; wording pending therapist review)
 
 Settled choices: **two-dimensional** (valence × arousal, not a single
-sad↔happy line); **multi-label, max 3** per entry; **vernacular** register in
+sad↔happy line); **multi-label, max 3** per entry (revised 2026-10-27: up to 2
+per part of the day, so a day whose mood shifts can carry 4); **vernacular** register in
 the core (clinical words live in the Bipolar lens); **medium** size (~20);
 **closed** set (the model may not invent tags); **feelings only** (no context/
 trigger tags yet); **binary** (no confidence).
@@ -156,7 +157,10 @@ trigger tags yet); **binary** (no confidence).
   closed set).
 - **Prompt:** a fixed system instruction describing the task, the allowed tags,
   and the "up to 3 strongest, only if clearly present" rule. Kept in the repo
-  and versioned.
+  and versioned. (Revised 2026-10-27: the model describes and tags the earlier
+  part of the day and the end of the day separately, grammar-constrained to the
+  closed set, and the two are merged; this keeps mixed days from collapsing to
+  their heavier half.)
 
 ## 6. Data model changes
 
@@ -279,7 +283,7 @@ Settle **before Phase 1** (they gate the first build):
    on real entries (tagging may be fine on 0.5B; import may want 1.5B).
 2. **Model delivery:** bundle vs first-run download.
 
-**Taxonomy shape is now decided** (§5): two-dimensional, multi-label max 3,
+**Taxonomy shape is now decided** (§5): two-dimensional, multi-label max 3 (4 on mixed days),
 vernacular core, ~20 closed tags, feelings-only, binary. What remains:
 
 3. **Wording sign-off with the therapist** — the provisional 20-tag set, and

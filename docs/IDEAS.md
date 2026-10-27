@@ -43,6 +43,26 @@ reflection, not a verdict.
 - The user's own text stays primary; any AI text is clearly marked as
   machine-generated and editable/dismissable.
 
+#### Tiered reflection engine — "pick your own"
+
+Reflection is a far harder task than tagging, so it gets its own engine,
+separate from the small tagging model, offered as tiers (see AI plan §4b):
+
+1. **Own writing only** — no model; the default.
+2. **Local medium model** — 3–4B (lean machines) or 7–8B (quality) via
+   llama.cpp; fully offline. ~8 GB RAM floor, 16 GB comfortable. Runs on
+   macOS/Windows/Linux at the engine level.
+3. **Bring-your-own API key** — explicit opt-in; frontier quality from the
+   provider of the user's choice. This feature (and only this feature) sends
+   text off-device, with clear consent.
+
+**Elegant part:** cloud providers go through **one OpenAI-compatible adapter**
+(base URL + key + model) with presets, so OpenAI, Anthropic-compatible
+gateways, and **Chinese models** (DeepSeek, Qwen, Kimi, Zhipu) — plus any
+custom endpoint — all work through a single code path. Keys stored in the
+platform keychain, scoped to reflection, never synced. Each choice carries a
+clear privacy label (local = private; cloud = text leaves the device).
+
 ### Rough design notes (for later)
 
 - **Data model:** a `Reflection` record (own text + optional AI text +

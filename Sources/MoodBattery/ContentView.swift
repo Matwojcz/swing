@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var diagramScrollDate: Date?
     @State private var searchText = ""
     @State private var searchMatches: [MoodEntry] = []
+    @State private var tagging = TaggingController()
+    @State private var showAutoTagAllConfirmation = false
     @FocusState private var mainFocused: Bool
 
     private let store = MoodEntryStore()
@@ -92,7 +94,10 @@ struct ContentView: View {
                         navigateEntry(direction: -1)
                     }, onNext: {
                         navigateEntry(direction: 1)
-                    })
+                    }, onAutoTag: {
+                        tagging.autoTag(entry, onTagged: applyTagged)
+                    }, isAutoTagging: tagging.activity == .single(entryID: entry.id ?? -1),
+                    autoTagDisabled: tagging.isBusy)
                     .transition(.opacity)
                 }
             }
@@ -127,7 +132,7 @@ struct ContentView: View {
             )
             .frame(maxHeight: .infinity)
             }
-            .frame(width: 280)
+            .frame(width: max(280, HistoryListView.minimumWidth))
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 20)
@@ -186,6 +191,13 @@ struct ContentView: View {
                 }
             }
             ToolbarItem {
+                Button(action: { showAutoTagAllConfirmation = true }) {
+                    Label("Auto-tag all entries", systemImage: "sparkles")
+                }
+                .help("Tag every entry with the on-device model")
+                .disabled(tagging.isBusy || entries.isEmpty)
+            }
+            ToolbarItem {
                 Menu {
                     Button("Export as CSV") { exportCSV() }
                     Button("Export as JSON") { exportJSON() }
@@ -203,6 +215,38 @@ struct ContentView: View {
             allowsMultipleSelection: true
         ) { result in
             handleFileImport(result)
+        }
+        .overlay(alignment: .bottom) {
+            if tagging.isBusy {
+                TaggingProgressCard(controller: tagging)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: tagging.isBusy)
+        .alert("Auto-tag your entries?", isPresented: $showAutoTagAllConfirmation) {
+            let untagged = entries.filter { !TaggingController.isTagged($0) }
+            if !untagged.isEmpty {
+                Button(untagged.count == entries.count ? "Tag all \(entries.count)" : "Tag \(untagged.count) untagged") {
+                    tagging.autoTagAll(untagged, onTagged: applyTagged)
+                }
+            }
+            if untagged.count < entries.count {
+                Button("Re-tag all \(entries.count)") {
+                    tagging.autoTagAll(entries, onTagged: applyTagged)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(autoTagAllMessage)
+        }
+        .alert("Auto-tag", isPresented: Binding(
+            get: { tagging.errorMessage != nil },
+            set: { if !$0 { tagging.errorMessage = nil } }
+        )) {
+            Button("OK") { tagging.errorMessage = nil }
+        } message: {
+            Text(tagging.errorMessage ?? "")
         }
         .sheet(isPresented: $showImportPreview) {
             ImportPreviewSheet(
@@ -231,6 +275,24 @@ struct ContentView: View {
     private func reload() {
         entries = (try? store.fetchAll()) ?? []
         runSearch()
+    }
+
+    /// Swaps a freshly tagged entry into the list, search results and open panel without reloading everything.
+    private func applyTagged(_ tagged: MoodEntry) {
+        if let i = entries.firstIndex(where: { $0.id == tagged.id }) { entries[i] = tagged }
+        if let i = searchMatches.firstIndex(where: { $0.id == tagged.id }) { searchMatches[i] = tagged }
+        if selectedEntry?.id == tagged.id { selectedEntry = tagged }
+    }
+
+    /// Explains the cost of a full pass before it starts, using the measured time per entry.
+    private var autoTagAllMessage: String {
+        let untagged = entries.filter { !TaggingController.isTagged($0) }.count
+        let time = { (count: Int) in TaggingProgressCard.durationText(Double(count) * TaggingController.estimatedSecondsPerEntry) }
+        let estimate = untagged == entries.count || untagged == 0
+            ? "Tagging \(entries.count) entries takes \(time(entries.count))."
+            : "Tagging the \(untagged) untagged entries takes \(time(untagged)); re-tagging all \(entries.count) takes \(time(entries.count))."
+        return "Swing reads each entry with the on-device model, so nothing leaves this Mac. \(estimate) "
+            + "You can keep using the app while it runs and cancel at any time."
     }
 
     /// Re-queries the database for the current search text (clearing the matches when not searching).

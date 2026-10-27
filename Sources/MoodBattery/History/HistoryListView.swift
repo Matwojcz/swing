@@ -14,6 +14,10 @@ struct HistoryListView: View {
 
     private let maxScale: CGFloat = 1.05
     private let magnifyRadius: CGFloat = 120
+    fileprivate static let rowInset: CGFloat = 8
+
+    /// Narrowest list width at which every row shows all its tags.
+    static var minimumWidth: CGFloat { HistoryEntryRow.minimumWidth + rowInset * 2 }
 
     var body: some View {
         Group {
@@ -105,22 +109,16 @@ private struct ScaledEntryRow: View {
 
     var body: some View {
         HistoryEntryRow(entry: entry)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, HistoryListView.rowInset)
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(
                         MoodColor.color(mood: entry.mood, flavour: entry.flavour),
                         lineWidth: isSelected ? 2 : 0
                     )
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, HistoryListView.rowInset)
             )
-            .background(GeometryReader { geo in
-                Color.clear.preference(
-                    key: RowMidYKey.self,
-                    value: geo.frame(in: .named("historyList")).midY
-                )
-            })
-            .onPreferenceChange(RowMidYKey.self) { rowMidY = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named("historyList")).midY } action: { rowMidY = $0 }
             .scaleEffect(scale, anchor: .center)
             .animation(.easeOut(duration: 0.15), value: hoverLocation)
             .contentShape(Rectangle())
@@ -130,13 +128,6 @@ private struct ScaledEntryRow: View {
                     Label("Delete", systemImage: "trash")
                 }
             }
-    }
-}
-
-private struct RowMidYKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 

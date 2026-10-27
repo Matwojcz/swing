@@ -79,6 +79,13 @@ final class DatabaseManager {
             try MoodEntryStore.backfillLocalDates(db)
         }
 
+        migrator.registerMigration("addTags") { db in
+            try db.alter(table: "moodEntry") { t in
+                t.add(column: "tags", .text).notNull().defaults(to: "[]")
+                t.add(column: "tagModelVersion", .text)
+            }
+        }
+
         return migrator
     }
 }

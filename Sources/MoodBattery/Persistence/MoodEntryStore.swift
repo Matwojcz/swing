@@ -19,6 +19,18 @@ struct MoodEntryStore {
         return entry
     }
 
+    /// Writes only the tag columns of one entry, so a title or note edit made while the model was running
+    /// isn't overwritten. Returns the fresh row, or nil if the entry was deleted in the meantime.
+    func setTags(_ tags: [MoodTag], version: String, forEntryID id: Int64) throws -> MoodEntry? {
+        try dbQueue.write { db in
+            guard var entry = try MoodEntry.fetchOne(db, key: id) else { return nil }
+            entry.tags = tags.map(\.rawValue)
+            entry.tagModelVersion = version
+            try entry.update(db, columns: ["tags", "tagModelVersion"])
+            return entry
+        }
+    }
+
     /// Returns all mood entries ordered by timestamp descending (newest first).
     func fetchAll() throws -> [MoodEntry] {
         try dbQueue.write { db in

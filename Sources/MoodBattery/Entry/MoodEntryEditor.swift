@@ -21,9 +21,24 @@ struct MoodEntryEditor: View {
     var onSave: (() -> Void)?
     /// When set, the gauge and flavour track display this entry's values in read-only mode instead of the editor draft.
     var previewEntry: MoodEntry?
+    /// Enlarges the gauge and flavour slider together (1 = design size); the parent caps it.
+    var gaugeZoom: CGFloat = 1
 
-    private let headerHeight: CGFloat = 56
-    private let headerGaugeSpacing: CGFloat = 8
+    @State private var gaugeRowSize: CGSize = .zero
+
+    private let headerHeight: CGFloat = Self.headerHeight
+    private let headerGaugeSpacing: CGFloat = Self.headerGaugeSpacing
+    private static let headerHeight: CGFloat = 56
+    private static let headerGaugeSpacing: CGFloat = 8
+    private static let gaugeSliderSpacing: CGFloat = 20
+    private static let flavourTrackWidth: CGFloat = 18 + 16
+    static let padding: CGFloat = 24
+
+    /// Footprint of the gauge row (readout, dial and flavour slider) at zoom 1, for the parent's zoom calculation.
+    static let gaugeRowDesignSize = CGSize(
+        width: GaugeView.width + gaugeSliderSpacing + flavourTrackWidth,
+        height: headerHeight + headerGaugeSpacing + GaugeView.height
+    )
 
     /// Whether the editor is currently showing a read-only preview of an existing entry.
     private var isPreviewing: Bool { previewEntry != nil }
@@ -34,7 +49,7 @@ struct MoodEntryEditor: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            HStack(alignment: .gaugeBaselineTop, spacing: 20) {
+            HStack(alignment: .gaugeBaselineTop, spacing: Self.gaugeSliderSpacing) {
                 VStack(spacing: headerGaugeSpacing) {
                     header
                         .frame(height: headerHeight)
@@ -62,6 +77,14 @@ struct MoodEntryEditor: View {
                     headerHeight + headerGaugeSpacing + GaugeView.baselineTopY
                 }
             }
+            .fixedSize()
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { gaugeRowSize = $0 }
+            // Scaling as a render transform keeps the drawing and drag maths at design size;
+            // the frame reserves the enlarged footprint so the fields below move down with it.
+            .scaleEffect(gaugeZoom, anchor: .top)
+            .frame(width: gaugeRowSize == .zero ? nil : gaugeRowSize.width * gaugeZoom,
+                   height: gaugeRowSize == .zero ? nil : gaugeRowSize.height * gaugeZoom,
+                   alignment: .top)
 
             if !isPreviewing {
                 TextField("Title", text: $title)
@@ -89,7 +112,7 @@ struct MoodEntryEditor: View {
                 }
             }
         }
-        .padding(24)
+        .padding(Self.padding)
     }
 
     private var header: some View {
@@ -124,7 +147,7 @@ struct MoodEntryEditor: View {
                 .frame(width: thumbSize, height: thumbSize)
                 .offset(y: displayFlavour * (length - thumbSize))
         }
-        .frame(width: thumbSize + 16, height: length)
+        .frame(width: Self.flavourTrackWidth, height: length)
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0)

@@ -12,12 +12,14 @@ struct HistoryListView: View {
     @State private var hoverLocation: CGPoint?
     @State private var isHovering = false
 
-    private let maxScale: CGFloat = 1.05
+    private static let maxScale: CGFloat = 1.05
     private let magnifyRadius: CGFloat = 120
-    fileprivate static let rowInset: CGFloat = 8
+    /// Side room for a row at full magnification (half its growth) plus the outer half of the 2pt selection stroke;
+    /// anything wider than the list is cut off by the fade mask.
+    fileprivate static let rowInset: CGFloat = ceil(HistoryEntryRow.minimumWidth * (maxScale - 1) / 2) + 2
 
-    /// Narrowest list width at which every row shows all its tags.
-    static var minimumWidth: CGFloat { HistoryEntryRow.minimumWidth + rowInset * 2 }
+    /// Width of the list: every row shows all its tags and still has room to magnify.
+    static var width: CGFloat { HistoryEntryRow.minimumWidth + rowInset * 2 }
 
     var body: some View {
         Group {
@@ -36,7 +38,7 @@ struct HistoryListView: View {
                                     isSelected: selectedEntry?.id == entry.id,
                                     hoverLocation: hoverLocation,
                                     isHovering: isHovering,
-                                    maxScale: maxScale,
+                                    maxScale: Self.maxScale,
                                     magnifyRadius: magnifyRadius,
                                     onSelect: { onSelect?(entry) },
                                     onDelete: { onDelete?(entry) }

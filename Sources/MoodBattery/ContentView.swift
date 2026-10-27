@@ -17,7 +17,18 @@ struct ContentView: View {
     @State private var searchMatches: [MoodEntry] = []
     @State private var tagging = TaggingController()
     @State private var showAutoTagAllConfirmation = false
+    @State private var mainAreaSize: CGSize = .zero
+    @State private var gaugeZoom: CGFloat = 1
+    /// Height of everything in the main column except the gauge row, measured while the entry fields are showing
+    /// (the tallest layout), so the gauge keeps one size whether or not an entry is selected.
+    @State private var columnHeightWithoutGauge: CGFloat?
     @FocusState private var mainFocused: Bool
+
+    /// The gauge-and-diagram column stops widening here; extra window width becomes margin around it.
+    private static let maxMainColumnWidth: CGFloat = 880
+    private static let maxGaugeZoom: CGFloat = 1.4
+    /// Space kept free above and below the column so it never touches the window edges.
+    private static let verticalBreathingRoom: CGFloat = 32
 
     private let store = MoodEntryStore()
     private let importer = MarkdownImporter()
@@ -29,7 +40,7 @@ struct ContentView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 24) {
                     MoodEntryEditor(targetDate: retroDate, onSaveRequest: { entry in
                         do {
                             if try store.hasEntry(on: entry.timestamp) {
@@ -43,7 +54,7 @@ struct ContentView: View {
                     }, onSave: {
                         retroDate = nil
                         reload()
-                    }, previewEntry: selectedEntry)
+                    }, previewEntry: selectedEntry, gaugeZoom: gaugeZoom)
                     MoodDiagramView(entries: entries, onSelectDate: { date in
                         let cal = Calendar.current
                         let day = cal.startOfDay(for: date)
@@ -67,6 +78,12 @@ struct ContentView: View {
                     }, scrollToDate: diagramScrollDate, highlightedEntry: selectedEntry,
                     searchMatches: isSearching ? searchMatches : nil)
                     .padding(.horizontal, 16)
+                }
+                .frame(maxWidth: Self.maxMainColumnWidth)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    guard selectedEntry == nil else { return }
+                    columnHeightWithoutGauge = height - MoodEntryEditor.gaugeRowDesignSize.height * gaugeZoom
+                    updateGaugeZoom()
                 }
 
                 if let entry = selectedEntry, isDetailPanelShown {
@@ -102,6 +119,10 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                mainAreaSize = size
+                updateGaugeZoom()
+            }
 
             VStack(spacing: 8) {
             if isSearching {
@@ -132,7 +153,7 @@ struct ContentView: View {
             )
             .frame(maxHeight: .infinity)
             }
-            .frame(width: max(280, HistoryListView.minimumWidth))
+            .frame(width: HistoryListView.width)
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 20)
@@ -275,6 +296,18 @@ struct ContentView: View {
     private func reload() {
         entries = (try? store.fetchAll()) ?? []
         runSearch()
+    }
+
+    /// Grows the gauge into whatever room the column leaves, limited by both height and width and capped at
+    /// `maxGaugeZoom`; never shrinks it below design size.
+    private func updateGaugeZoom() {
+        guard let rest = columnHeightWithoutGauge, mainAreaSize != .zero else { return }
+        let design = MoodEntryEditor.gaugeRowDesignSize
+        let byHeight = (mainAreaSize.height - Self.verticalBreathingRoom - rest) / design.height
+        let columnWidth = min(mainAreaSize.width, Self.maxMainColumnWidth) - MoodEntryEditor.padding * 2
+        let byWidth = columnWidth / design.width
+        let zoom = min(max(min(byHeight, byWidth), 1), Self.maxGaugeZoom)
+        if abs(zoom - gaugeZoom) > 0.01 { gaugeZoom = zoom }
     }
 
     /// Swaps a freshly tagged entry into the list, search results and open panel without reloading everything.

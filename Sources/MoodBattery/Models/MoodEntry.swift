@@ -15,10 +15,15 @@ struct MoodEntry: Identifiable, Codable, Equatable {
     /// Unlike `timestamp`, it never shifts when the system time zone or DST changes. Empty only for
     /// rows inserted outside the app, which are backfilled from `timestamp` on first read.
     var localDate: String
+    /// AI mood tag names, stored as plain strings so a tag later dropped from the taxonomy can't stop the
+    /// history from loading. Read them through `moodTags`.
+    var tags: [String]
+    /// Model and prompt version that produced `tags`; nil means the entry has never been auto-tagged.
+    var tagModelVersion: String?
 
     /// Creates an entry; `localDate` defaults to the day of `timestamp` in the current time zone.
     init(id: Int64?, mood: Double, flavour: Double, title: String? = nil, note: String? = nil,
-         timestamp: Date, localDate: String? = nil) {
+         timestamp: Date, localDate: String? = nil, tags: [String] = [], tagModelVersion: String? = nil) {
         self.id = id
         self.mood = mood
         self.flavour = flavour
@@ -26,7 +31,12 @@ struct MoodEntry: Identifiable, Codable, Equatable {
         self.note = note
         self.timestamp = timestamp
         self.localDate = localDate ?? Self.localDateString(for: timestamp)
+        self.tags = tags
+        self.tagModelVersion = tagModelVersion
     }
+
+    /// The entry's tags that are still in the closed vocabulary, in stored order.
+    var moodTags: [MoodTag] { tags.compactMap(MoodTag.init(rawValue:)) }
 
     /// Formats the calendar day of `date` in `calendar` as `yyyy-MM-dd`.
     static func localDateString(for date: Date, calendar: Calendar = .current) -> String {

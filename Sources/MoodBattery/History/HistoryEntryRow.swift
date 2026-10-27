@@ -49,12 +49,16 @@ struct HistoryEntryRow: View {
             }
             .frame(width: 28)
 
-            Text(displayTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .foregroundStyle(.primary)
-
-            Spacer(minLength: 8)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(displayTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+                if !entry.moodTags.isEmpty {
+                    MoodTagChips(tags: entry.moodTags, fontSize: 10, compact: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(Self.timeFormatter.string(from: entry.timestamp))
                 .font(.system(size: 11))
@@ -86,7 +90,8 @@ private struct GlassRowModifier: ViewModifier {
 
 #Preview {
     VStack(spacing: 8) {
-        HistoryEntryRow(entry: MoodEntry(id: 1, mood: 72, flavour: 0.2, title: "Good day", note: "Good day at work", timestamp: Date()))
+        HistoryEntryRow(entry: MoodEntry(id: 1, mood: 7.2, flavour: 0.2, title: "Early start, eight designs, and a day full of big ideas",
+                                         note: "Good day at work", timestamp: Date(), tags: ["energised", "excited", "happy", "content"]))
         HistoryEntryRow(entry: MoodEntry(id: 2, mood: 20, flavour: 0.5, title: nil, note: nil, timestamp: Date()))
     }
     .padding()

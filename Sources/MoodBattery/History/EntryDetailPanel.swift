@@ -9,6 +9,11 @@ struct EntryDetailPanel: View {
     var onUpdate: ((MoodEntry) -> Void)?
     var onPrevious: (() -> Void)?
     var onNext: (() -> Void)?
+    var onAutoTag: (() -> Void)?
+    /// True while the model is tagging this entry.
+    var isAutoTagging = false
+    /// True while the tagger is busy with anything (another entry or a full pass).
+    var autoTagDisabled = false
 
     @State private var editingField: EditField?
     @State private var draftMood: String = ""
@@ -82,7 +87,7 @@ struct EntryDetailPanel: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Self.dateFormatter.string(from: entry.timestamp))
                     .font(.system(size: 13, weight: .semibold))
@@ -90,7 +95,22 @@ struct EntryDetailPanel: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
-            Spacer()
+            if !entry.moodTags.isEmpty {
+                MoodTagChips(tags: entry.moodTags, fontSize: 12, compact: true)
+                    .padding(.leading, 8)
+            }
+            Spacer(minLength: 8)
+            if let onAutoTag {
+                Button(action: onAutoTag) {
+                    Label(isAutoTagging ? "Tagging…" : "Auto-tag", systemImage: "sparkles")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .modifier(GlassButtonModifier())
+                .controlSize(.small)
+                .disabled(autoTagDisabled)
+                .help(entry.moodTags.isEmpty ? "Tag this entry with the on-device model"
+                                             : "Re-tag this entry with the on-device model")
+            }
             if let onDelete {
                 Button(action: onDelete) {
                     Image(systemName: "trash")

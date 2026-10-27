@@ -4,6 +4,9 @@ import Foundation
 /// tag set. Pure string logic — no model dependency — so it is unit-testable on its own and shared
 /// by every `EntryClassifier` implementation (the real one and the stub).
 enum TagPrompt {
+    /// Bump whenever the prompt, schema or merge rules change, so already-tagged entries count as stale.
+    static let version = "split-v1"
+
     /// Tags the model may pick for each part of the day (earlier / by the end).
     static let maxTagsPerPart = 2
     /// Hard cap on tags per entry: a steady day collapses to 1-2, only a day whose mood shifts reaches 4.

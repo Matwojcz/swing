@@ -86,6 +86,14 @@ per-condition apps:
   mapping text onto a fixed tag set, keeps the download small, and runs on
   modest/older hardware. Final size (0.5B vs 1.5B) to be settled by testing
   quality against speed on real entries.
+  - *Update (Oct 2026):* testing on 73 real entries ruled out 0.5B and 1.5B
+    (too inaccurate); v1.1.0 shipped Qwen2.5 **3B**, whose licence turned out
+    to be research-only. Release 1.1.5 replaces it with **Gemma 4 E2B**
+    (Apache-2.0, ~3.1 GB Q4_K_M): it matched the 3B on agreement with the
+    author's mood ratings and overlapped more with the author's own tags.
+    Also tested: Qwen3.5 4B (tied in a blind review, overuses "calm"), Gemma 4
+    E4B (similar quality, 5 GB), Llama 3.2 3B, Phi-4-mini, SmolLM3 3B. Gemma 4
+    needs its own turn template (`Template.gemma4` in `LlamaClassifier.swift`).
 - **Integration:** llama.cpp via a Swift wrapper (SwiftPM package such as
   LLM.swift / llama.cpp bindings, or a thin C-interop target vendoring
   llama.cpp). Exact binding to be chosen in Phase 1.

@@ -22,11 +22,11 @@ final class TaggingController {
         }
     }
 
-    static let modelURL = URL(fileURLWithPath: "/Users/matwojcz/Models/qwen2.5-3b-instruct-q4_k_m.gguf")
+    static let modelURL = URL(fileURLWithPath: "/Users/matwojcz/Models/gemma-4-E2B-it-Q4_K_M.gguf")
     /// Stored on every tagged entry. Entries carrying a different version count as untagged.
     static let version = "\(modelURL.deletingPathExtension().lastPathComponent)/\(TagPrompt.version)"
-    /// Measured on an M4 Pro (1.4 to 2.4 s per entry); used for the estimate before any entry has run.
-    static let estimatedSecondsPerEntry = 2.0
+    /// Measured on an M4 Pro (about 2.4 s per entry in the harness); used for the estimate before any entry has run.
+    static let estimatedSecondsPerEntry = 2.4
 
     private(set) var activity: Activity = .idle
     private(set) var isLoadingModel = false

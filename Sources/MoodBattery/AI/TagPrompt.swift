@@ -5,7 +5,7 @@ import Foundation
 /// by every `EntryClassifier` implementation (the real one and the stub).
 enum TagPrompt {
     /// Bump whenever the prompt, schema or merge rules change, so already-tagged entries count as stale.
-    static let version = "split-v1"
+    static let version = "split-v2"
 
     /// Tags the model may pick for each part of the day (earlier / by the end).
     static let maxTagsPerPart = 2
@@ -23,11 +23,14 @@ enum TagPrompt {
         If the day stayed the same throughout, use the same tags for both parts. Tag only feelings the \
         writer states or clearly shows. A busy day, a short night or lots of activity is not tiredness or \
         stress unless the writer says they felt that way. Only use "okay" for a genuinely ordinary, neutral day.
+        Relief that something hard is over is not calm: tag how the writer actually is at that point. If the writer \
+        qualifies a word, like "tired in a good way", tag the feeling they mean, not the word.
         Pick the most specific tag for each feeling:
         anxious = worry, fear or nerves about what might happen; frustrated = blocked, let down, things not going right; \
         irritable = short-tempered, easily annoyed; angry = anger at someone or something; low = sad, teary, down; \
         flat = muted, nothing feels like much; numb = unable to feel anything; lonely = missing people or closeness; \
         restless = unable to settle; overwhelmed = too much at once; tired = worn out, sleepy or drained.
+        calm = genuinely settled and at ease, not just relieved.
         Reply with only a JSON object like {"earlier": "...", "earlier_tags": ["..."], "later": "...", "later_tags": ["..."]}.
 
         Example entry: "Felt shaky all morning, couldn't focus at work, everything felt pointless by evening"
@@ -41,6 +44,9 @@ enum TagPrompt {
 
         Example entry: "Exhausted and low all day, stayed in bed, still feeling empty at night"
         Example reply: {"earlier": "exhausted, low", "earlier_tags": ["tired", "low"], "later": "empty", "later_tags": ["low", "flat"]}
+
+        Example entry: "Panic attack on the train this morning and I had to go home. It passed by the evening and I was relieved, but still shaky and completely drained"
+        Example reply: {"earlier": "panicky, frightened", "earlier_tags": ["anxious"], "later": "relieved but shaky, drained", "later_tags": ["tired", "anxious"]}
 
         Example entry: "Just a normal Tuesday, nothing special happened"
         Example reply: {"earlier": "ordinary", "earlier_tags": ["okay"], "later": "ordinary", "later_tags": ["okay"]}

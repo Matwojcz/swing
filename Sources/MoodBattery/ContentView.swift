@@ -15,7 +15,7 @@ struct ContentView: View {
     @State private var diagramScrollDate: Date?
     @State private var searchText = ""
     @State private var searchMatches: [MoodEntry] = []
-    @State private var tagging = TaggingController()
+    let tagging: TaggingController
     @State private var showAutoTagAllConfirmation = false
     @State private var mainAreaSize: CGSize = .zero
     @State private var gaugeZoom: CGFloat = 1
@@ -460,5 +460,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(tagging: TaggingController())
 }

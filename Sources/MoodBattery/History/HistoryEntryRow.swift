@@ -5,6 +5,7 @@ struct HistoryEntryRow: View {
 
     @State private var isHovered = false
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
+    @Environment(\.cycleCalendar) private var cycle
 
     private static let chipFontSize: CGFloat = 10
     private static let spacing: CGFloat = 10
@@ -47,7 +48,7 @@ struct HistoryEntryRow: View {
         if let note = entry.note, !note.isEmpty {
             return String(note.prefix(50))
         }
-        return MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens)
+        return MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens, cycle: cycle.position(of: entry.day()))
     }
 
     var body: some View {

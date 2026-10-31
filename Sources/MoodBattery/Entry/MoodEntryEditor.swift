@@ -14,6 +14,7 @@ struct MoodEntryEditor: View {
     @State private var note: String = ""
     @State private var saveError: String?
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
+    @Environment(\.cycleCalendar) private var cycle
 
     var targetDate: Date?
     /// Called with the composed entry when the user taps "Log entry". Return nil on success or a user-facing error string to display. Persistence and duplicate-day validation live in the parent.
@@ -24,6 +25,8 @@ struct MoodEntryEditor: View {
     var previewEntry: MoodEntry?
     /// Enlarges the gauge and flavour slider together (1 = design size); the parent caps it.
     var gaugeZoom: CGFloat = 1
+    /// Marks or unmarks a day as a period start (PMDD lens only). Saved straight away, separately from the entry.
+    var onPeriodStartChange: ((Date, Bool) -> Void)?
 
     @State private var gaugeRowSize: CGSize = .zero
 
@@ -105,6 +108,15 @@ struct MoodEntryEditor: View {
                         .foregroundStyle(.secondary)
                 }
 
+                if lens == .pmdd, let onPeriodStartChange {
+                    Toggle("Period started on this day", isOn: Binding(
+                        get: { cycle.isStart(entryDate) },
+                        set: { onPeriodStartChange(entryDate, $0) }
+                    ))
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+                }
+
                 Button("Log entry", action: save)
                     .modifier(GlassButtonModifier())
 
@@ -123,7 +135,8 @@ struct MoodEntryEditor: View {
             // With a lens on, a loupe ring sits over the label and the lens word pulls into focus inside it.
             // The ZStack lets the outgoing and incoming words overlap while they swap.
             ZStack {
-                Text(MoodState.label(mood: displayMood, flavour: displayFlavour, lens: lens))
+                Text(MoodState.label(mood: displayMood, flavour: displayFlavour, lens: lens,
+                                     cycle: cycle.position(of: previewEntry?.day() ?? entryDate)))
                     .font(.caption.weight(lens == .none ? .regular : .medium))
                     .foregroundStyle(lens == .none ? .secondary : .primary)
                     .id(lens)

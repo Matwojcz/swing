@@ -86,6 +86,12 @@ final class DatabaseManager {
             }
         }
 
+        migrator.registerMigration("createPeriodStart") { db in
+            try db.create(table: "periodStart") { t in
+                t.primaryKey("localDate", .text)
+            }
+        }
+
         return migrator
     }
 }

@@ -1,6 +1,6 @@
 # Swing
 
-**v1.1.6**
+**v1.1.7**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time. Labels use neutral everyday words
@@ -17,9 +17,11 @@ energy level (0-10, in 0.1 steps):
   at baseline (5), then through green into gold/orange or red/magenta above.
 - A vertical flavour slider sets the tone of elevated mood: calm on one
   end, irritable on the other.
-- The lens turret beside the mood label switches the wording: everyday words
-  or the Bipolar lens, whose bands follow the Bipolar UK Mood Scale at the
-  nearest whole number (8.5 and up reads as mania).
+- The lens turret beside the mood label switches the wording: everyday words,
+  the Bipolar lens, whose bands follow the Bipolar UK Mood Scale at the
+  nearest whole number (8.5 and up reads as mania), or the PMDD lens, which
+  places each day in the menstrual cycle from logged period start days and
+  marks low or irritable days as premenstrual or non-cycle related.
 - Past 8.8, a redline zone with spark particles marks the hype range —
   like a tachometer needle entering a danger zone.
 

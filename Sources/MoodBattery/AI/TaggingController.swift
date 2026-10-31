@@ -35,7 +35,8 @@ final class TaggingController {
     var errorMessage: String?
 
     private var classifier: EntryClassifier?
-    private var batchTask: Task<Void, Never>?
+    /// The single-entry or batch run in progress.
+    private var task: Task<Void, Never>?
     private let store = MoodEntryStore()
 
     var isBusy: Bool { activity != .idle }
@@ -46,8 +47,11 @@ final class TaggingController {
     func autoTag(_ entry: MoodEntry, onTagged: @escaping (MoodEntry) -> Void) {
         guard !isBusy, let id = entry.id else { return }
         activity = .single(entryID: id)
-        Task {
-            defer { activity = .idle }
+        task = Task {
+            defer {
+                activity = .idle
+                task = nil
+            }
             do {
                 if let tagged = try await tag(entry) {
                     onTagged(tagged)
@@ -66,11 +70,11 @@ final class TaggingController {
         guard !isBusy, !entries.isEmpty else { return }
         activity = .batch(done: 0, total: entries.count)
         secondsRemaining = Double(entries.count) * Self.estimatedSecondsPerEntry
-        batchTask = Task {
+        task = Task {
             defer {
                 activity = .idle
                 secondsRemaining = nil
-                batchTask = nil
+                task = nil
             }
             do {
                 _ = try await loadedClassifier()
@@ -98,7 +102,15 @@ final class TaggingController {
     }
 
     func cancelBatch() {
-        batchTask?.cancel()
+        task?.cancel()
+    }
+
+    /// Lets the entry being tagged finish (a batch stops after it), then frees the model. Call before the app exits:
+    /// ggml aborts if a loaded model's Metal buffers outlive its global Metal device, which a static destructor frees.
+    func releaseModel() async {
+        task?.cancel()
+        await task?.value
+        classifier = nil
     }
 
     /// Classifies and saves one entry. Returns nil when the entry was deleted meanwhile or the model gave no tags.

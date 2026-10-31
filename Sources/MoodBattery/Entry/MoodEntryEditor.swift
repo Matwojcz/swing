@@ -13,6 +13,7 @@ struct MoodEntryEditor: View {
     @State private var title: String = ""
     @State private var note: String = ""
     @State private var saveError: String?
+    @AppStorage(Lens.storageKey) private var lens: Lens = .none
 
     var targetDate: Date?
     /// Called with the composed entry when the user taps "Log entry". Return nil on success or a user-facing error string to display. Persistence and duplicate-day validation live in the parent.
@@ -30,6 +31,8 @@ struct MoodEntryEditor: View {
     private let headerGaugeSpacing: CGFloat = Self.headerGaugeSpacing
     private static let headerHeight: CGFloat = 56
     private static let headerGaugeSpacing: CGFloat = 8
+    /// Space between the mood label and the lens turret, clear of the loupe ring around the label.
+    private static let turretGap: CGFloat = 20
     private static let gaugeSliderSpacing: CGFloat = 20
     private static let flavourTrackWidth: CGFloat = 18 + 16
     static let padding: CGFloat = 24
@@ -116,13 +119,34 @@ struct MoodEntryEditor: View {
     }
 
     private var header: some View {
-        VStack(spacing: 2) {
-            Text(MoodState.label(mood: displayMood, flavour: displayFlavour))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 6) {
+            // With a lens on, a loupe ring sits over the label and the lens word pulls into focus inside it.
+            // The ZStack lets the outgoing and incoming words overlap while they swap.
+            ZStack {
+                Text(MoodState.label(mood: displayMood, flavour: displayFlavour, lens: lens))
+                    .font(.caption.weight(lens == .none ? .regular : .medium))
+                    .foregroundStyle(lens == .none ? .secondary : .primary)
+                    .id(lens)
+                    .transition(.focusPull)
+            }
+            .background {
+                if lens != .none {
+                    Capsule()
+                        .stroke(LensTurret.outlineColor, lineWidth: LensTurret.outlineWidth)
+                        .frame(height: LensTurret.size)
+                        .padding(.horizontal, -10)
+                        .transition(.scale(scale: 1.6).combined(with: .opacity))
+                }
+            }
+            // The turret sits just right of the label, outside the layout, so the label stays centred over the gauge.
+            .overlay(alignment: .trailing) {
+                LensTurret(lens: $lens)
+                    .alignmentGuide(.trailing) { d in d[.leading] - Self.turretGap }
+            }
             Text(MoodScale.format(displayMood))
                 .font(.system(size: 28, weight: .medium))
         }
+        .animation(.spring(duration: 0.45, bounce: 0.2), value: lens)
     }
 
     private var flavourLabel: String {

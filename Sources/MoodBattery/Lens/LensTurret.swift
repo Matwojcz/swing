@@ -2,17 +2,21 @@ import SwiftUI
 
 /// The lens switch, drawn as a microscope's revolving nosepiece: one objective per lens around a disc.
 /// Clicking turns the disc forward until the next objective sits at the top, and that lens is selected.
+/// Hovering shows the selected lens's name under the disc.
 struct LensTurret: View {
     @Binding var lens: Lens
     /// Accumulated so the disc always turns the same way, even when it wraps from the last lens to the first.
     @State private var rotation: Double?
+    @State private var isHovering = false
 
     private static let step = 360 / Double(Lens.allCases.count)
     /// Also the loupe ring's height, so the two outlines line up beside each other.
     static let size: CGFloat = 22
     static let outlineWidth: CGFloat = 1.5
     static let outlineColor = Color.secondary.opacity(0.6)
-    private static let objectiveSize: CGFloat = 7
+    private static let objectiveSize: CGFloat = 6
+    /// Distance of each objective's centre from the disc's centre.
+    private static let orbit: CGFloat = 5.5
 
     var body: some View {
         Button(action: turn) {
@@ -23,7 +27,7 @@ struct LensTurret: View {
                     Circle()
                         .fill(item == lens ? Color.accentColor : Color.secondary.opacity(0.4))
                         .frame(width: Self.objectiveSize, height: Self.objectiveSize)
-                        .offset(y: -(Self.size - Self.objectiveSize) / 2 + 2.5)
+                        .offset(y: -Self.orbit)
                         .rotationEffect(.degrees(Double(index) * Self.step))
                 }
             }
@@ -32,7 +36,22 @@ struct LensTurret: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .help("\(lens.name). Click to turn to the next lens.")
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) { isHovering = hovering }
+        }
+        // Drawn outside the layout so the label beside the turret doesn't move when it appears.
+        .overlay(alignment: .top) {
+            if isHovering {
+                Text(lens.name)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .offset(y: Self.size + 4)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
+        }
+        .help("Click to turn to the next lens")
         .accessibilityLabel("Lens")
         .accessibilityValue(lens.name)
     }

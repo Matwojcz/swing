@@ -14,6 +14,8 @@ struct EntryDetailPanel: View {
     var isAutoTagging = false
     /// True while the tagger is busy with anything (another entry or a full pass).
     var autoTagDisabled = false
+    /// Marks or unmarks the entry's day as a period start (PMDD lens only).
+    var onPeriodStartChange: ((Date, Bool) -> Void)?
 
     @State private var editingField: EditField?
     @State private var draftMood: String = ""
@@ -22,6 +24,7 @@ struct EntryDetailPanel: View {
     @State private var draftNote: String = ""
     @FocusState private var panelFocused: Bool
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
+    @Environment(\.cycleCalendar) private var cycle
 
     private enum EditField: Equatable { case mood, flavour, title, note }
 
@@ -38,7 +41,7 @@ struct EntryDetailPanel: View {
     }()
 
     private var moodLabel: String {
-        MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens)
+        MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens, cycle: cycle.position(of: entry.day()))
     }
 
     private var flavourLabel: String {
@@ -148,6 +151,15 @@ struct EntryDetailPanel: View {
                         flavourField
                     }
                 }
+            }
+
+            if lens == .pmdd, let onPeriodStartChange {
+                Toggle("Period started on this day", isOn: Binding(
+                    get: { cycle.isStart(entry.day()) },
+                    set: { onPeriodStartChange(entry.day(), $0) }
+                ))
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
             }
 
             titleField

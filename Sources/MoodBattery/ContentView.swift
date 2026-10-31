@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var searchMatches: [MoodEntry] = []
     let tagging: TaggingController
     @State private var showAutoTagAllConfirmation = false
+    @State private var cycle = CycleCalendar.empty
     @State private var mainAreaSize: CGSize = .zero
     @State private var gaugeZoom: CGFloat = 1
     /// Height of everything in the main column except the gauge row, measured while the entry fields are showing
@@ -31,6 +32,7 @@ struct ContentView: View {
     private static let verticalBreathingRoom: CGFloat = 32
 
     private let store = MoodEntryStore()
+    private let periodStore = PeriodStore()
     private let importer = MarkdownImporter()
 
     private var isSearching: Bool { !EntrySearch.words(in: searchText).isEmpty }
@@ -54,7 +56,7 @@ struct ContentView: View {
                     }, onSave: {
                         retroDate = nil
                         reload()
-                    }, previewEntry: selectedEntry, gaugeZoom: gaugeZoom)
+                    }, previewEntry: selectedEntry, gaugeZoom: gaugeZoom, onPeriodStartChange: setPeriodStart)
                     MoodDiagramView(entries: entries, onSelectDate: { date in
                         let cal = Calendar.current
                         let day = cal.startOfDay(for: date)
@@ -114,7 +116,7 @@ struct ContentView: View {
                     }, onAutoTag: {
                         tagging.autoTag(entry, onTagged: applyTagged)
                     }, isAutoTagging: tagging.activity == .single(entryID: entry.id ?? -1),
-                    autoTagDisabled: tagging.isBusy)
+                    autoTagDisabled: tagging.isBusy, onPeriodStartChange: setPeriodStart)
                     .transition(.opacity)
                 }
             }
@@ -190,6 +192,7 @@ struct ContentView: View {
             }
             return .ignored
         }
+        .environment(\.cycleCalendar, cycle)
         .onAppear {
             reload()
             mainFocused = true
@@ -296,6 +299,16 @@ struct ContentView: View {
     private func reload() {
         entries = (try? store.fetchAll()) ?? []
         runSearch()
+        reloadCycle()
+    }
+
+    private func reloadCycle() {
+        cycle = CycleCalendar(localDates: (try? periodStore.fetchStarts()) ?? [])
+    }
+
+    private func setPeriodStart(_ day: Date, _ isStart: Bool) {
+        try? periodStore.setStart(MoodEntry.localDateString(for: day), isStart: isStart)
+        reloadCycle()
     }
 
     /// Grows the gauge into whatever room the column leaves, limited by both height and width and capped at

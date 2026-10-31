@@ -4,6 +4,7 @@ struct HistoryEntryRow: View {
     let entry: MoodEntry
 
     @State private var isHovered = false
+    @AppStorage(Lens.storageKey) private var lens: Lens = .none
 
     private static let chipFontSize: CGFloat = 10
     private static let spacing: CGFloat = 10
@@ -46,7 +47,7 @@ struct HistoryEntryRow: View {
         if let note = entry.note, !note.isEmpty {
             return String(note.prefix(50))
         }
-        return MoodState.label(mood: entry.mood, flavour: entry.flavour)
+        return MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens)
     }
 
     var body: some View {

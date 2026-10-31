@@ -21,6 +21,7 @@ struct EntryDetailPanel: View {
     @State private var draftTitle: String = ""
     @State private var draftNote: String = ""
     @FocusState private var panelFocused: Bool
+    @AppStorage(Lens.storageKey) private var lens: Lens = .none
 
     private enum EditField: Equatable { case mood, flavour, title, note }
 
@@ -37,7 +38,7 @@ struct EntryDetailPanel: View {
     }()
 
     private var moodLabel: String {
-        MoodState.label(mood: entry.mood, flavour: entry.flavour)
+        MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens)
     }
 
     private var flavourLabel: String {

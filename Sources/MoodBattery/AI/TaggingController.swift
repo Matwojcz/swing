@@ -110,6 +110,11 @@ final class TaggingController {
     func releaseModel() async {
         task?.cancel()
         await task?.value
+        releaseIdleModel()
+    }
+
+    /// Frees the model straight away. Only enough while idle: a run in progress holds its own reference.
+    func releaseIdleModel() {
         classifier = nil
     }
 

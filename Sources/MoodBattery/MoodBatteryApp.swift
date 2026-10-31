@@ -17,6 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let tagging = TaggingController()
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Free the model on the spot when idle: waiting needs the main actor, which is blocked if terminate
+        // was called from a main-queue block.
+        guard tagging.isBusy else {
+            tagging.releaseIdleModel()
+            return .terminateNow
+        }
         Task {
             await tagging.releaseModel()
             sender.reply(toApplicationShouldTerminate: true)

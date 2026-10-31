@@ -1,10 +1,12 @@
 # Swing
 
-**v1.1.5**
+**v1.1.6**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
-log and reflect on mood state over time, using direct language (depressive,
-hype, baseline) rather than euphemisms.
+log and reflect on mood state over time. Labels use neutral everyday words
+(very low, balanced, very high) by default; the opt-in Bipolar lens switches
+them to the direct terms of the Bipolar UK Mood Scale (depression, hypomania,
+mania).
 
 ## How it works
 
@@ -15,6 +17,9 @@ energy level (0-10, in 0.1 steps):
   at baseline (5), then through green into gold/orange or red/magenta above.
 - A vertical flavour slider sets the tone of elevated mood: calm on one
   end, irritable on the other.
+- The lens turret beside the mood label switches the wording: everyday words
+  or the Bipolar lens, whose bands follow the Bipolar UK Mood Scale at the
+  nearest whole number (8.5 and up reads as mania).
 - Past 8.8, a redline zone with spark particles marks the hype range —
   like a tachometer needle entering a danger zone.
 

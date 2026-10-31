@@ -24,8 +24,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.matwojcz.Swing
-        MARKETING_VERSION: "1.1.5"
-        CURRENT_PROJECT_VERSION: "7"
+        MARKETING_VERSION: "1.1.6"
+        CURRENT_PROJECT_VERSION: "8"
         ENABLE_HARDENED_RUNTIME: true
         # Signing the app and the embedded llama.framework with one team keeps the hardened runtime's
         # library validation happy; ad-hoc signatures count as different teams and the framework won't load.

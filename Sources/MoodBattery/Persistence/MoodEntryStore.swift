@@ -19,13 +19,22 @@ struct MoodEntryStore {
         return entry
     }
 
+    /// Returns one entry, or nil if it doesn't exist (any more).
+    func fetch(id: Int64) throws -> MoodEntry? {
+        try dbQueue.read { db in
+            try MoodEntry.fetchOne(db, key: id)
+        }
+    }
+
     /// Writes only the tag columns of one entry, so a title or note edit made while the model was running
-    /// isn't overwritten. Returns the fresh row, or nil if the entry was deleted in the meantime.
-    func setTags(_ tags: [MoodTag], version: String, forEntryID id: Int64) throws -> MoodEntry? {
+    /// isn't overwritten. `title` and `note` are the text the tags were made from: if the entry has changed since,
+    /// the tags are kept but left without a version, marking them out of date. Returns the fresh row, or nil if
+    /// the entry was deleted in the meantime.
+    func setTags(_ tags: [MoodTag], version: String, forEntryID id: Int64, title: String?, note: String?) throws -> MoodEntry? {
         try dbQueue.write { db in
             guard var entry = try MoodEntry.fetchOne(db, key: id) else { return nil }
             entry.tags = tags.map(\.rawValue)
-            entry.tagModelVersion = version
+            entry.tagModelVersion = entry.title == title && entry.note == note ? version : nil
             try entry.update(db, columns: ["tags", "tagModelVersion"])
             return entry
         }

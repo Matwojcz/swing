@@ -10,6 +10,10 @@ struct ContentView: View {
     @State private var pendingImportEntries: [EditableImportEntry] = []
     @State private var showImportPreview = false
     @State private var importError: String?
+    /// Shown after an import that skipped days already in the diary.
+    @State private var importNotice: String?
+    /// Shown when a database write fails, so a lost edit doesn't pass for a saved one.
+    @State private var saveError: String?
     @State private var showClearConfirmation = false
     @State private var retroDate: Date?
     @State private var diagramScrollDate: Date?
@@ -98,7 +102,7 @@ struct ContentView: View {
                     EntryDetailPanel(entry: entry, highlightTerms: isSearching ? EntrySearch.words(in: searchText) : [], onClose: {
                         closeDetailPanel()
                     }, onDelete: {
-                        try? store.delete(entry)
+                        guard persist({ try store.delete(entry) }) else { return }
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedEntry = nil
                             isDetailPanelShown = false
@@ -106,9 +110,9 @@ struct ContentView: View {
                         mainFocused = true
                         reload()
                     }, onUpdate: { updated in
-                        try? store.save(updated)
+                        let saved = persist({ try store.save(updated) })
                         reload()
-                        selectedEntry = updated
+                        if saved { selectedEntry = updated }
                     }, onPrevious: {
                         navigateEntry(direction: -1)
                     }, onNext: {
@@ -143,7 +147,7 @@ struct ContentView: View {
                     }
                 },
                 onDelete: { entry in
-                    try? store.delete(entry)
+                    guard persist({ try store.delete(entry) }) else { return }
                     if selectedEntry?.id == entry.id {
                         selectedEntry = nil
                         isDetailPanelShown = false
@@ -226,7 +230,9 @@ struct ContentView: View {
                     Button("Export as CSV") { exportCSV() }
                     Button("Export as JSON") { exportJSON() }
                     Divider()
+                    #if DEBUG
                     Button("Seed 6 months of dummy data") { seedDummyData() }
+                    #endif
                     Button("Clear all entries", role: .destructive) { showClearConfirmation = true }
                 } label: {
                     Label("Data", systemImage: "ellipsis.circle")
@@ -287,6 +293,22 @@ struct ContentView: View {
         } message: {
             Text(importError ?? "")
         }
+        .alert("Import", isPresented: Binding(
+            get: { importNotice != nil },
+            set: { if !$0 { importNotice = nil } }
+        )) {
+            Button("OK") { importNotice = nil }
+        } message: {
+            Text(importNotice ?? "")
+        }
+        .alert("Couldn't save", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button("OK") { saveError = nil }
+        } message: {
+            Text(saveError ?? "")
+        }
         .alert("Delete all entries?", isPresented: $showClearConfirmation) {
             Button("Delete all", role: .destructive) { clearAllData() }
             Button("Cancel", role: .cancel) {}
@@ -307,8 +329,20 @@ struct ContentView: View {
     }
 
     private func setPeriodStart(_ day: Date, _ isStart: Bool) {
-        try? periodStore.setStart(MoodEntry.localDateString(for: day), isStart: isStart)
+        persist { try periodStore.setStart(MoodEntry.localDateString(for: day), isStart: isStart) }
         reloadCycle()
+    }
+
+    /// Runs a database write, showing the error instead of failing silently. Returns whether it succeeded.
+    @discardableResult
+    private func persist(_ write: () throws -> Void) -> Bool {
+        do {
+            try write()
+            return true
+        } catch {
+            saveError = error.localizedDescription
+            return false
+        }
     }
 
     /// Grows the gauge into whatever room the column leaves, limited by both height and width and capped at
@@ -369,7 +403,9 @@ struct ContentView: View {
         }
     }
 
-    /// Generates 6 months of random-walk mood entries for development and testing.
+    #if DEBUG
+    /// Generates 6 months of random-walk mood entries for development and testing, skipping days that already have one.
+    /// Debug builds only: in the app it would mix fake days into the real diary.
     private func seedDummyData() {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
@@ -392,10 +428,13 @@ struct ContentView: View {
                 id: nil, mood: mood, flavour: flavour,
                 title: title, note: nil, timestamp: date
             )
-            try? store.save(entry)
+            if (try? store.hasEntry(on: date)) == false {
+                try? store.save(entry)
+            }
         }
         reload()
     }
+    #endif
 
     /// Moves the selection to the previous (-1) or next (+1) entry in the list; selects the first entry if none is selected yet.
     private func navigateEntry(direction: Int) {
@@ -453,8 +492,10 @@ struct ContentView: View {
         try? content.write(to: url, atomically: true, encoding: .utf8)
     }
 
-    /// Saves all reviewed import entries to the database and closes the preview sheet.
+    /// Saves the reviewed import entries and closes the preview sheet. Days that already have an entry are skipped,
+    /// as the editor does, so re-importing a diary can't create duplicate days.
     private func confirmImport() {
+        var skipped = 0
         for entry in pendingImportEntries {
             let mood = MoodEntry(
                 id: nil,
@@ -464,11 +505,21 @@ struct ContentView: View {
                 note: entry.note.isEmpty ? nil : entry.note,
                 timestamp: entry.timestamp
             )
-            try? store.save(mood)
+            let saved = persist {
+                if try store.hasEntry(on: mood.timestamp) {
+                    skipped += 1
+                } else {
+                    try store.save(mood)
+                }
+            }
+            if !saved { break }
         }
         showImportPreview = false
         pendingImportEntries = []
         reload()
+        if skipped > 0 {
+            importNotice = "Skipped \(skipped) \(skipped == 1 ? "entry" : "entries") for days that already have one."
+        }
     }
 }
 

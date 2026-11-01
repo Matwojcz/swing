@@ -67,7 +67,11 @@ struct EntryDetailPanel: View {
         .focused($panelFocused)
         .focusEffectDisabled()
         .onAppear { panelFocused = true }
-        .onChange(of: entry.id) { _, _ in panelFocused = true }
+        .onChange(of: entry.id) { _, _ in
+            // Drop an unfinished edit, or committing it would write this entry's draft into the newly selected one.
+            editingField = nil
+            panelFocused = true
+        }
         .onChange(of: editingField) { _, newField in
             if newField == nil { panelFocused = true }
         }
@@ -221,7 +225,8 @@ struct EntryDetailPanel: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .onTapGesture(count: 2) {
-                    draftFlavour = flavourLabel
+                    // The number, not the label: committing "calm" unchanged would snap 0.30 to 0.
+                    draftFlavour = String(format: "%.2f", entry.flavour)
                     editingField = .flavour
                 }
         }
@@ -351,14 +356,23 @@ struct EntryDetailPanel: View {
     private func commitTitle() {
         var updated = entry
         updated.title = draftTitle.isEmpty ? nil : draftTitle
-        onUpdate?(updated)
-        editingField = nil
+        commitText(updated)
     }
 
     /// Saves the edited note (or nil if empty) and exits editing mode.
     private func commitNote() {
         var updated = entry
         updated.note = draftNote.isEmpty ? nil : draftNote
+        commitText(updated)
+    }
+
+    /// Pushes a title or note edit. Changed text leaves the tags in place but marks them as out of date,
+    /// so "Auto-tag all" picks the entry up again.
+    private func commitText(_ updated: MoodEntry) {
+        var updated = updated
+        if updated.title != entry.title || updated.note != entry.note {
+            updated.tagModelVersion = nil
+        }
         onUpdate?(updated)
         editingField = nil
     }

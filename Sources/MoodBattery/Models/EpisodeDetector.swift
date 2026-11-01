@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Modelled on DSM-5 bipolar II: a depressive episode needs at least 14 days, an elevated
 /// (hypomanic) one at least 4. A run starts and ends on a day whose average mood crosses the
-/// threshold (below 3.5 / above 6.5). Between those days it bridges up to a few consecutive
+/// threshold (below 3.5 / 6.5 and above, matching the Bipolar lens, which rounds 6.5 up to hypomania). Between those days it bridges up to a few consecutive
 /// non-qualifying days — unlogged days, or logged days near baseline (up to 5.5 for depressive runs,
 /// down to 4.5 for elevated ones) — but a logged day on the opposite side ends it. The span must also
 /// be at least 70% logged qualifying days, so sparse logging can't stretch an episode.
@@ -87,7 +87,7 @@ enum EpisodeDetector {
             if day.mood < threshold { return .qualifying }
             return day.mood > toleratedLimit ? .breaking : .gap
         }
-        if day.mood > threshold { return .qualifying }
+        if day.mood >= threshold { return .qualifying }
         return day.mood < toleratedLimit ? .breaking : .gap
     }
 

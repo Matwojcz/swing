@@ -27,13 +27,16 @@ struct MarkdownImporter {
             var explicitFlavour: Double?
 
             for line in currentBody {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if let val = parseField(trimmed, name: "mood") ?? parseField(trimmed, name: "energy") {
-                    explicitMood = max(MoodScale.min, min(MoodScale.max, val))
-                } else if let val = parseField(trimmed, name: "flavour") ?? parseField(trimmed, name: "flavor") {
-                    explicitFlavour = max(0, min(1, val))
-                } else {
+                let fields = parseFields(line.trimmingCharacters(in: .whitespaces))
+                guard !fields.isEmpty else {
                     noteLines.append(line)
+                    continue
+                }
+                if let val = fields["mood"] ?? fields["energy"] {
+                    explicitMood = max(MoodScale.min, min(MoodScale.max, val))
+                }
+                if let val = fields["flavour"] ?? fields["flavor"] {
+                    explicitFlavour = max(0, min(1, val))
                 }
             }
 
@@ -169,12 +172,24 @@ struct MarkdownImporter {
 
     // MARK: - Field parsing
 
-    /// Parses a "key: value" line, returning the numeric value if the key matches the given field name.
-    private func parseField(_ line: String, name: String) -> Double? {
-        let lower = line.lowercased()
-        guard lower.hasPrefix("\(name):") else { return nil }
-        let valueStr = line.dropFirst(name.count + 1).trimmingCharacters(in: .whitespaces)
-        return Double(valueStr)
+    private static let fieldRegex = try! NSRegularExpression(
+        pattern: #"\b(mood|energy|flavour|flavor)\s*:\s*(\d+(?:\.\d+)?)"#,
+        options: .caseInsensitive
+    )
+
+    /// Reads the numeric fields of a field line, keyed by lowercased name. A field line starts with a field name
+    /// and may hold several, as in "Mood: 4.8. Flavour: 0.4"; any other line returns an empty dictionary.
+    private func parseFields(_ line: String) -> [String: Double] {
+        let nsLine = line as NSString
+        let matches = Self.fieldRegex.matches(in: line, range: NSRange(location: 0, length: nsLine.length))
+        guard let first = matches.first, first.range.location == 0 else { return [:] }
+        var fields: [String: Double] = [:]
+        for match in matches {
+            if let value = Double(nsLine.substring(with: match.range(at: 2))) {
+                fields[nsLine.substring(with: match.range(at: 1)).lowercased()] = value
+            }
+        }
+        return fields
     }
 
     // MARK: - Mood estimation

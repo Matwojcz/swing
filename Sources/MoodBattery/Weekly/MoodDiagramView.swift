@@ -11,6 +11,7 @@ enum DiagramScale: String, CaseIterable {
         }
     }
 
+    /// Pages shown at least; the diagram adds more when the oldest entry is further back.
     var pageCount: Int { 52 }
 
     var label: String { rawValue.capitalized }
@@ -35,7 +36,12 @@ struct MoodDiagramView: View {
 
     private var calendar: Calendar { Calendar.current }
 
-    private var pageCount: Int { scale.pageCount }
+    /// Enough pages to reach the oldest entry, and never fewer than the scale's default.
+    private var pageCount: Int {
+        guard let oldest = entries.map({ $0.day(in: calendar) }).min() else { return scale.pageCount }
+        let days = (calendar.dateComponents([.day], from: oldest, to: calendar.startOfDay(for: Date())).day ?? 0) + 1
+        return max(scale.pageCount, (days + scale.dayCount - 1) / scale.dayCount)
+    }
 
     /// Returns the array of calendar dates visible on the given page, working backwards from today.
     private func daysForPage(_ page: Int) -> [Date] {
@@ -74,13 +80,15 @@ struct MoodDiagramView: View {
     }
 
     var body: some View {
+        // Detected once per render and clipped per page.
+        let episodes = EpisodeDetector.detect(entries: entries, calendar: calendar)
         VStack(spacing: 4) {
             monthHeader(for: visiblePage)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 0) {
                     ForEach(0..<pageCount, id: \.self) { page in
-                        diagramPage(page: page)
+                        diagramPage(page: page, episodes: episodes)
                             .containerRelativeFrame(.horizontal)
                     }
                 }
@@ -111,7 +119,7 @@ struct MoodDiagramView: View {
     // MARK: - Page content
 
     /// Builds the full content for one diagram page: Canvas with episodes, baseline, mood line, a highlight ring for the selected entry (drawn as an overlay so it can fade), plus tap targets and day labels.
-    private func diagramPage(page: Int) -> some View {
+    private func diagramPage(page: Int, episodes: [EpisodeDetector.Episode]) -> some View {
         let days = daysForPage(page)
 
         let drawingPoints: [MoodDataAggregator.DataPoint]
@@ -127,7 +135,7 @@ struct MoodDiagramView: View {
             tappablePoints = boundary.tappable
         }
 
-        let pageEpisodes = episodesForPage(days)
+        let pageEpisodes = episodesForPage(days, from: episodes)
 
         return VStack(spacing: 4) {
             ZStack {
@@ -524,17 +532,12 @@ struct MoodDiagramView: View {
         var episode: EpisodeDetector.Episode
     }
 
-    /// Runs global episode detection once for the current entries; the diagram then clips these per page.
-    private var globalEpisodes: [EpisodeDetector.Episode] {
-        EpisodeDetector.detect(entries: entries, calendar: calendar)
-    }
-
     /// Clips global episodes to a page's date range, tracking whether each band extends beyond the page edges.
-    private func episodesForPage(_ days: [Date]) -> [PageEpisode] {
+    private func episodesForPage(_ days: [Date], from episodes: [EpisodeDetector.Episode]) -> [PageEpisode] {
         guard let pageStart = days.first, let pageEnd = days.last else { return [] }
         var result: [PageEpisode] = []
 
-        for ep in globalEpisodes {
+        for ep in episodes {
             if ep.endDate < pageStart || ep.startDate > pageEnd { continue }
 
             let extendsLeft = ep.startDate < pageStart

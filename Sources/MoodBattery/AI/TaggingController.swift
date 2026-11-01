@@ -118,13 +118,15 @@ final class TaggingController {
         classifier = nil
     }
 
-    /// Classifies and saves one entry. Returns nil when the entry was deleted meanwhile or the model gave no tags.
+    /// Classifies and saves one entry, reading its current text first: a batch holds the entries as they were
+    /// when it started. Returns nil when the entry was deleted meanwhile or the model gave no tags.
     private func tag(_ entry: MoodEntry) async throws -> MoodEntry? {
         guard let id = entry.id else { return nil }
         let classifier = try await loadedClassifier()
-        let tags = try await classifier.classify(title: entry.title, note: entry.note)
+        guard let current = try store.fetch(id: id) else { return nil }
+        let tags = try await classifier.classify(title: current.title, note: current.note)
         guard !tags.isEmpty else { return nil }
-        return try store.setTags(tags, version: Self.version, forEntryID: id)
+        return try store.setTags(tags, version: Self.version, forEntryID: id, title: current.title, note: current.note)
     }
 
     private func loadedClassifier() async throws -> EntryClassifier {

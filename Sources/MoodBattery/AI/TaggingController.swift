@@ -41,9 +41,10 @@ final class TaggingController {
 
     var isBusy: Bool { activity != .idle }
 
-    static func isTagged(_ entry: MoodEntry) -> Bool { entry.tagModelVersion == version }
+    /// Tagged by the current model, or by hand.
+    static func isTagged(_ entry: MoodEntry) -> Bool { entry.tagModelVersion == version || entry.hasManualTags }
 
-    /// Tags one entry and hands the saved result to `onTagged`.
+    /// Tags one entry and hands the saved result to `onTagged`. Replaces hand-picked tags too, since the user asked.
     func autoTag(_ entry: MoodEntry, onTagged: @escaping (MoodEntry) -> Void) {
         guard !isBusy, let id = entry.id else { return }
         activity = .single(entryID: id)
@@ -53,7 +54,7 @@ final class TaggingController {
                 task = nil
             }
             do {
-                if let tagged = try await tag(entry) {
+                if let tagged = try await tag(entry, keepingManual: false) {
                     onTagged(tagged)
                 } else {
                     errorMessage = "The model didn't return any tags for this entry. Try again, or edit the note first."
@@ -66,6 +67,7 @@ final class TaggingController {
 
     /// Tags `entries` one at a time (in the order given), calling `onTagged` after each is saved.
     /// An entry that fails is left untagged and the pass carries on; `cancelBatch()` stops after the current entry.
+    /// Entries whose tags were picked by hand, even after the pass started, are skipped.
     func autoTagAll(_ entries: [MoodEntry], onTagged: @escaping (MoodEntry) -> Void) {
         guard !isBusy, !entries.isEmpty else { return }
         activity = .batch(done: 0, total: entries.count)
@@ -86,7 +88,7 @@ final class TaggingController {
             var failed = 0
             for (index, entry) in entries.enumerated() {
                 if Task.isCancelled { break }
-                if let tagged = try? await tag(entry) {
+                if let tagged = try? await tag(entry, keepingManual: true) {
                     onTagged(tagged)
                 } else {
                     failed += 1
@@ -119,14 +121,17 @@ final class TaggingController {
     }
 
     /// Classifies and saves one entry, reading its current text first: a batch holds the entries as they were
-    /// when it started. Returns nil when the entry was deleted meanwhile or the model gave no tags.
-    private func tag(_ entry: MoodEntry) async throws -> MoodEntry? {
+    /// when it started. With `keepingManual`, an entry with hand-picked tags comes back unchanged.
+    /// Returns nil when the entry was deleted meanwhile or the model gave no tags.
+    private func tag(_ entry: MoodEntry, keepingManual: Bool) async throws -> MoodEntry? {
         guard let id = entry.id else { return nil }
         let classifier = try await loadedClassifier()
         guard let current = try store.fetch(id: id) else { return nil }
+        if keepingManual, current.hasManualTags { return current }
         let tags = try await classifier.classify(title: current.title, note: current.note)
         guard !tags.isEmpty else { return nil }
-        return try store.setTags(tags, version: Self.version, forEntryID: id, title: current.title, note: current.note)
+        return try store.setTags(tags, version: Self.version, forEntryID: id, title: current.title, note: current.note,
+                                 keepingManual: keepingManual)
     }
 
     private func loadedClassifier() async throws -> EntryClassifier {

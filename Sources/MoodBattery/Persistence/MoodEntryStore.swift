@@ -28,11 +28,14 @@ struct MoodEntryStore {
 
     /// Writes only the tag columns of one entry, so a title or note edit made while the model was running
     /// isn't overwritten. `title` and `note` are the text the tags were made from: if the entry has changed since,
-    /// the tags are kept but left without a version, marking them out of date. Returns the fresh row, or nil if
-    /// the entry was deleted in the meantime.
-    func setTags(_ tags: [MoodTag], version: String, forEntryID id: Int64, title: String?, note: String?) throws -> MoodEntry? {
+    /// the tags are kept but left without a version, marking them out of date. With `keepingManual`, hand-picked
+    /// tags (set while the model was running) are left as they are. Returns the fresh row, or nil if the entry
+    /// was deleted in the meantime.
+    func setTags(_ tags: [MoodTag], version: String, forEntryID id: Int64, title: String?, note: String?,
+                 keepingManual: Bool) throws -> MoodEntry? {
         try dbQueue.write { db in
             guard var entry = try MoodEntry.fetchOne(db, key: id) else { return nil }
+            if keepingManual, entry.hasManualTags { return entry }
             entry.tags = tags.map(\.rawValue)
             entry.tagModelVersion = entry.title == title && entry.note == note ? version : nil
             try entry.update(db, columns: ["tags", "tagModelVersion"])

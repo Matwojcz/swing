@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The lens switch, drawn as a microscope's revolving nosepiece: one objective per lens around a disc.
 /// Clicking turns the disc forward until the next objective sits at the top, and that lens is selected.
-/// Hovering shows the selected lens's name under the disc.
+/// Hovering shows the selected lens's name beside the disc.
 struct LensTurret: View {
     @Binding var lens: Lens
     /// Accumulated so the disc always turns the same way, even when it wraps from the last lens to the first.
@@ -39,14 +39,15 @@ struct LensTurret: View {
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) { isHovering = hovering }
         }
-        // Drawn outside the layout so the label beside the turret doesn't move when it appears.
-        .overlay(alignment: .top) {
+        // Drawn outside the layout so the label beside the turret doesn't move when it appears. It sits to the
+        // right, centred on the disc: below, it would run into the mood number.
+        .overlay(alignment: .leading) {
             if isHovering {
                 Text(lens.name)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize()
-                    .offset(y: Self.size + 4)
+                    .offset(x: Self.size + 6)
                     .transition(.opacity)
                     .allowsHitTesting(false)
             }

@@ -18,8 +18,12 @@ struct MoodEntry: Identifiable, Codable, Equatable {
     /// AI mood tag names, stored as plain strings so a tag later dropped from the taxonomy can't stop the
     /// history from loading. Read them through `moodTags`.
     var tags: [String]
-    /// Model and prompt version that produced `tags`; nil means the entry has never been auto-tagged.
+    /// Model and prompt version that produced `tags`, or `manualTagVersion` when they were set by hand;
+    /// nil means the entry has never been tagged or its tags are out of date.
     var tagModelVersion: String?
+
+    /// Stored in `tagModelVersion` for tags picked by hand, which "Auto-tag all" leaves alone.
+    static let manualTagVersion = "manual"
 
     /// Creates an entry; `localDate` defaults to the day of `timestamp` in the current time zone.
     init(id: Int64?, mood: Double, flavour: Double, title: String? = nil, note: String? = nil,
@@ -37,6 +41,8 @@ struct MoodEntry: Identifiable, Codable, Equatable {
 
     /// The entry's tags that are still in the closed vocabulary, in stored order.
     var moodTags: [MoodTag] { tags.compactMap(MoodTag.init(rawValue:)) }
+
+    var hasManualTags: Bool { tagModelVersion == Self.manualTagVersion }
 
     /// Formats the calendar day of `date` in `calendar` as `yyyy-MM-dd`.
     static func localDateString(for date: Date, calendar: Calendar = .current) -> String {

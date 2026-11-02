@@ -1,6 +1,6 @@
 # Swing
 
-**v1.1.8**
+**v1.1.9**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time. Labels use neutral everyday words
@@ -47,9 +47,9 @@ your mood over time across week, month, and year scales.
   near-baseline days, but a logged day on the opposite side ends them, and at
   least 70% of the span must be qualifying days.
 - **Entry detail panel** — tap any entry to view and inline-edit all
-  fields (double-click mood, flavour, title, or note). Shows the entry's tags,
-  an Auto-tag button, and (in the PMDD lens) a "Period started on this day"
-  checkbox. Delete entries here.
+  fields (double-click mood, flavour, title, note, or the tags). Shows the
+  entry's tags, an Auto-tag button, and (in the PMDD lens) a "Period started
+  on this day" checkbox. Delete entries here.
 - **On-device AI tagging** — Gemma 4 E2B, run locally through llama.cpp,
   reads an entry's title and note and picks up to four tags from a fixed list
   of feelings (low, flat, anxious, calm, hopeful, energised…): one or two for
@@ -58,6 +58,10 @@ your mood over time across week, month, and year scales.
   toolbar, with a progress bar and time estimate. Tags appear as coloured
   chips in the history list and the panel. Editing a note marks its tags out
   of date, and changing the model or prompt version re-queues every entry.
+  When the model gets an entry wrong, double-click its tags in the panel to
+  remove some or add others from the same list, up to four. Tags picked by
+  hand are marked with a small hand icon, and "Auto-tag all" leaves them
+  alone; the panel's own Auto-tag button still replaces them if asked.
   The model never sees the mood rating, so tags stay an independent reading
   of the text.
 - **Keyboard navigation** — up/down arrows flick through entries, ESC
@@ -130,7 +134,7 @@ migrated by GRDB on launch. Table `moodEntry`:
 | `timestamp` | datetime | UTC instant the entry was logged                         |
 | `localDate` | text     | `yyyy-MM-dd` calendar day the entry belongs to           |
 | `tags`      | text     | JSON array of AI tag names, `[]` when untagged           |
-| `tagModelVersion` | text | Model and prompt version behind `tags`; null if never tagged or out of date |
+| `tagModelVersion` | text | Model and prompt version behind `tags`, `manual` if picked by hand; null if never tagged or out of date |
 
 Table `periodStart` holds one `localDate` (`yyyy-MM-dd`, primary key) per
 logged period start, for the PMDD lens.

@@ -28,6 +28,8 @@ struct ContentView: View {
     /// (the tallest layout), so the gauge keeps one size whether or not an entry is selected.
     @State private var columnHeightWithoutGauge: CGFloat?
     @FocusState private var mainFocused: Bool
+    /// True while a field in the detail panel is being edited, so Escape ends the edit before it closes the panel.
+    @State private var isEditingInPanel = false
 
     /// The gauge-and-diagram column stops widening here; extra window width becomes margin around it.
     private static let maxMainColumnWidth: CGFloat = 880
@@ -120,7 +122,8 @@ struct ContentView: View {
                     }, onAutoTag: {
                         tagging.autoTag(entry, onTagged: applyTagged)
                     }, isAutoTagging: tagging.activity == .single(entryID: entry.id ?? -1),
-                    autoTagDisabled: tagging.isBusy, onPeriodStartChange: setPeriodStart)
+                    autoTagDisabled: tagging.isBusy, onPeriodStartChange: setPeriodStart,
+                    isEditing: $isEditingInPanel)
                     .transition(.opacity)
                 }
             }
@@ -184,6 +187,10 @@ struct ContentView: View {
             return .handled
         }
         .onKeyPress(.escape) {
+            if isEditingInPanel {
+                isEditingInPanel = false
+                return .handled
+            }
             if isDetailPanelShown {
                 closeDetailPanel()
                 return .handled
@@ -256,14 +263,15 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.2), value: tagging.isBusy)
         .alert("Auto-tag your entries?", isPresented: $showAutoTagAllConfirmation) {
             let untagged = entries.filter { !TaggingController.isTagged($0) }
+            let retaggable = entries.filter { !$0.hasManualTags }
             if !untagged.isEmpty {
-                Button(untagged.count == entries.count ? "Tag all \(entries.count)" : "Tag \(untagged.count) untagged") {
+                Button(untagged.count == retaggable.count ? "Tag all \(retaggable.count)" : "Tag \(untagged.count) untagged") {
                     tagging.autoTagAll(untagged, onTagged: applyTagged)
                 }
             }
-            if untagged.count < entries.count {
-                Button("Re-tag all \(entries.count)") {
-                    tagging.autoTagAll(entries, onTagged: applyTagged)
+            if untagged.count < retaggable.count {
+                Button("Re-tag all \(retaggable.count)") {
+                    tagging.autoTagAll(retaggable, onTagged: applyTagged)
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -367,11 +375,17 @@ struct ContentView: View {
     /// Explains the cost of a full pass before it starts, using the measured time per entry.
     private var autoTagAllMessage: String {
         let untagged = entries.filter { !TaggingController.isTagged($0) }.count
+        let retaggable = entries.filter { !$0.hasManualTags }.count
+        let manual = entries.count - retaggable
+        guard retaggable > 0 else { return "Every entry has tags you picked by hand, so there's nothing to auto-tag." }
         let time = { (count: Int) in TaggingProgressCard.durationText(Double(count) * TaggingController.estimatedSecondsPerEntry) }
-        let estimate = untagged == entries.count || untagged == 0
-            ? "Tagging \(entries.count) entries takes \(time(entries.count))."
-            : "Tagging the \(untagged) untagged entries takes \(time(untagged)); re-tagging all \(entries.count) takes \(time(entries.count))."
-        return "Swing reads each entry with the on-device model, so nothing leaves this Mac. \(estimate) "
+        let estimate = untagged == retaggable || untagged == 0
+            ? "Tagging \(retaggable) entries takes \(time(retaggable))."
+            : "Tagging the \(untagged) untagged entries takes \(time(untagged)); re-tagging all \(retaggable) takes \(time(retaggable))."
+        let kept = manual == 0 ? ""
+            : manual == 1 ? " The entry whose tags you picked by hand is left as it is."
+            : " The \(manual) entries whose tags you picked by hand are left as they are."
+        return "Swing reads each entry with the on-device model, so nothing leaves this Mac. \(estimate)\(kept) "
             + "You can keep using the app while it runs and cancel at any time."
     }
 

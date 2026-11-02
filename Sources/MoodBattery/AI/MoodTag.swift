@@ -20,6 +20,15 @@ enum MoodTag: String, CaseIterable, Codable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    /// The vocabulary in its valence × arousal groups, in declaration order, for pickers.
+    static let groups: [[MoodTag]] = [
+        [.low, .flat, .numb, .tired, .foggy, .lonely],
+        [.anxious, .restless, .overwhelmed, .irritable, .frustrated, .angry],
+        [.calm, .content, .rested],
+        [.happy, .hopeful, .energised, .excited],
+        [.okay],
+    ]
+
     /// The full allowed vocabulary as a comma-separated list, for the model prompt.
     static var promptList: String {
         allCases.map(\.rawValue).joined(separator: ", ")

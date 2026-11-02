@@ -21,16 +21,30 @@ extension MoodTag {
 struct MoodTagChip: View {
     let tag: MoodTag
     var fontSize: CGFloat = 11
+    /// Shows a remove button inside the chip when set.
+    var onRemove: (() -> Void)?
 
     var body: some View {
-        Text(tag.rawValue)
-            .font(.system(size: fontSize, weight: .medium))
-            .lineLimit(1)
-            .fixedSize()
-            .padding(.horizontal, fontSize * 0.6)
-            .padding(.vertical, fontSize * 0.2)
-            .background(Capsule().fill(tag.tint.opacity(0.28)))
-            .overlay(Capsule().stroke(tag.tint.opacity(0.55), lineWidth: 0.5))
+        HStack(spacing: fontSize * 0.3) {
+            Text(tag.rawValue)
+                .font(.system(size: fontSize, weight: .medium))
+                .lineLimit(1)
+            if let onRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: fontSize * 0.7, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Remove \(tag.rawValue)")
+                .accessibilityLabel("Remove \(tag.rawValue)")
+            }
+        }
+        .fixedSize()
+        .padding(.horizontal, fontSize * 0.6)
+        .padding(.vertical, fontSize * 0.2)
+        .background(Capsule().fill(tag.tint.opacity(0.28)))
+        .overlay(Capsule().stroke(tag.tint.opacity(0.55), lineWidth: 0.5))
     }
 }
 

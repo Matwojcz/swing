@@ -16,17 +16,21 @@ struct EntryDetailPanel: View {
     var autoTagDisabled = false
     /// Marks or unmarks the entry's day as a period start (PMDD lens only).
     var onPeriodStartChange: ((Date, Bool) -> Void)?
+    /// True while a field is being edited. The window's Escape handler runs before the panel's own, so it reads
+    /// this to end the edit (by setting it to false) instead of closing the panel.
+    var isEditing: Binding<Bool> = .constant(false)
 
     @State private var editingField: EditField?
     @State private var draftMood: String = ""
     @State private var draftFlavour: String = ""
     @State private var draftTitle: String = ""
     @State private var draftNote: String = ""
+    @State private var draftTags: [MoodTag] = []
     @FocusState private var panelFocused: Bool
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
     @Environment(\.cycleCalendar) private var cycle
 
-    private enum EditField: Equatable { case mood, flavour, title, note }
+    private enum EditField: Equatable { case mood, flavour, title, note, tags }
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -73,8 +77,13 @@ struct EntryDetailPanel: View {
             panelFocused = true
         }
         .onChange(of: editingField) { _, newField in
+            isEditing.wrappedValue = newField != nil
             if newField == nil { panelFocused = true }
         }
+        .onChange(of: isEditing.wrappedValue) { _, editing in
+            if !editing { editingField = nil }
+        }
+        .onDisappear { isEditing.wrappedValue = false }
         .onExitCommand {
             if editingField != nil {
                 editingField = nil
@@ -95,6 +104,18 @@ struct EntryDetailPanel: View {
     }
 
     private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            headerTopRow
+            if editingField == .tags {
+                tagEditor
+            } else {
+                tagChips
+            }
+        }
+        .padding(16)
+    }
+
+    private var headerTopRow: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Self.dateFormatter.string(from: entry.timestamp))
@@ -102,10 +123,6 @@ struct EntryDetailPanel: View {
                 Text(Self.timeFormatter.string(from: entry.timestamp))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-            }
-            if !entry.moodTags.isEmpty {
-                MoodTagChips(tags: entry.moodTags, fontSize: 12)
-                    .padding(.leading, 8)
             }
             Spacer(minLength: 8)
             if let onAutoTag {
@@ -115,9 +132,10 @@ struct EntryDetailPanel: View {
                 }
                 .modifier(GlassButtonModifier())
                 .controlSize(.small)
-                .disabled(autoTagDisabled)
+                .disabled(autoTagDisabled || editingField == .tags)
                 .help(entry.moodTags.isEmpty ? "Tag this entry with the on-device model"
-                                             : "Re-tag this entry with the on-device model")
+                      : entry.hasManualTags ? "Replace the tags you picked with the on-device model's"
+                      : "Re-tag this entry with the on-device model")
             }
             if let onDelete {
                 Button(action: onDelete) {
@@ -134,7 +152,6 @@ struct EntryDetailPanel: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(16)
     }
 
     private var content: some View {
@@ -230,6 +247,75 @@ struct EntryDetailPanel: View {
                     editingField = .flavour
                 }
         }
+    }
+
+    /// The header's tags; double-click to edit them (not while the model is tagging this entry).
+    private var tagChips: some View {
+        Group {
+            if entry.moodTags.isEmpty {
+                Text("No tags")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.quaternary)
+            } else {
+                HStack(spacing: 6) {
+                    MoodTagChips(tags: entry.moodTags, fontSize: 12)
+                    if entry.hasManualTags {
+                        Image(systemName: "hand.point.up.left")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .help("Tags picked by hand. Auto-tag all leaves them as they are.")
+                    }
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            guard !isAutoTagging else { return }
+            draftTags = entry.moodTags
+            editingField = .tags
+        }
+    }
+
+    /// Remove tags or add more from the closed vocabulary, up to `TagPrompt.maxTags`.
+    private var tagEditor: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(draftTags) { tag in
+                    MoodTagChip(tag: tag, fontSize: 12) {
+                        draftTags.removeAll { $0 == tag }
+                    }
+                }
+                if draftTags.count < TagPrompt.maxTags {
+                    Menu {
+                        ForEach(Array(MoodTag.groups.enumerated()), id: \.offset) { index, group in
+                            if index > 0 { Divider() }
+                            ForEach(group.filter { !draftTags.contains($0) }) { tag in
+                                Button(tag.rawValue) { draftTags.append(tag) }
+                            }
+                        }
+                    } label: {
+                        Label("Add tag", systemImage: "plus")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                }
+                Spacer(minLength: 8)
+                Button {
+                    commitTags()
+                } label: {
+                    Text("Done")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .modifier(GlassButtonModifier())
+                .controlSize(.small)
+            }
+            Text("Up to \(TagPrompt.maxTags) tags. Tags you pick by hand are kept when you auto-tag all entries.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.tankSurface))
     }
 
     @ViewBuilder
@@ -366,14 +452,26 @@ struct EntryDetailPanel: View {
         commitText(updated)
     }
 
-    /// Pushes a title or note edit. Changed text leaves the tags in place but marks them as out of date,
-    /// so "Auto-tag all" picks the entry up again.
+    /// Pushes a title or note edit. Changed text leaves the tags in place but marks model tags as out of date,
+    /// so "Auto-tag all" picks the entry up again. Tags picked by hand stay theirs.
     private func commitText(_ updated: MoodEntry) {
         var updated = updated
-        if updated.title != entry.title || updated.note != entry.note {
+        if (updated.title != entry.title || updated.note != entry.note) && !entry.hasManualTags {
             updated.tagModelVersion = nil
         }
         onUpdate?(updated)
+        editingField = nil
+    }
+
+    /// Saves the edited tags as picked by hand. Removing every tag leaves the entry untagged, so
+    /// "Auto-tag all" can tag it again.
+    private func commitTags() {
+        if draftTags != entry.moodTags {
+            var updated = entry
+            updated.tags = draftTags.map(\.rawValue)
+            updated.tagModelVersion = draftTags.isEmpty ? nil : MoodEntry.manualTagVersion
+            onUpdate?(updated)
+        }
         editingField = nil
     }
 }

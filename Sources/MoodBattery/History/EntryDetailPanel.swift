@@ -3,7 +3,7 @@ import SwiftUI
 struct EntryDetailPanel: View {
     let entry: MoodEntry
     /// Search words to highlight in the title and note (empty when not searching).
-    var highlightTerms: [String] = []
+    var highlightTerms: [EntrySearch.Term] = []
     var onClose: () -> Void
     var onDelete: (() -> Void)?
     var onUpdate: ((MoodEntry) -> Void)?
@@ -46,6 +46,10 @@ struct EntryDetailPanel: View {
 
     private var moodLabel: String {
         MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens, cycle: cycle.position(of: entry.day()))
+    }
+
+    private var searchNames: [String] {
+        MoodState.searchNames(mood: entry.mood, lens: lens, cycle: cycle.position(of: entry.day()))
     }
 
     private var flavourLabel: String {
@@ -162,7 +166,7 @@ struct EntryDetailPanel: View {
                     .frame(width: 6, height: 44)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(moodLabel)
+                    Text(highlighted(moodLabel, terms: EntrySearch.nameTerms(highlightTerms, names: searchNames)))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
 
@@ -258,7 +262,7 @@ struct EntryDetailPanel: View {
                     .foregroundStyle(.quaternary)
             } else {
                 HStack(spacing: 6) {
-                    MoodTagChips(tags: entry.moodTags, fontSize: 12)
+                    MoodTagChips(tags: entry.moodTags, fontSize: 12, highlightTerms: highlightTerms)
                     if entry.hasManualTags {
                         Image(systemName: "hand.point.up.left")
                             .font(.system(size: 11))
@@ -398,10 +402,11 @@ struct EntryDetailPanel: View {
         }
     }
 
-    /// Returns `text` with every occurrence of the search words given a highlight background.
-    private func highlighted(_ text: String) -> AttributedString {
+    /// Returns `text` with every occurrence of the search words given a highlight background. The mood label
+    /// passes only the terms that matched one of the day's band names.
+    private func highlighted(_ text: String, terms: [EntrySearch.Term]? = nil) -> AttributedString {
         var attributed = AttributedString(text)
-        for range in EntrySearch.ranges(of: highlightTerms, in: text) {
+        for range in EntrySearch.ranges(of: terms ?? highlightTerms, in: text) {
             if let target = Range(range, in: attributed) {
                 attributed[target].backgroundColor = .yellow.opacity(0.35)
             }

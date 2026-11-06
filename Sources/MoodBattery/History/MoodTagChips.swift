@@ -23,6 +23,8 @@ struct MoodTagChip: View {
     var fontSize: CGFloat = 11
     /// Shows a remove button inside the chip when set.
     var onRemove: (() -> Void)?
+    /// Outlines the chip, for a tag that matched the search.
+    var isHighlighted = false
 
     var body: some View {
         HStack(spacing: fontSize * 0.3) {
@@ -45,6 +47,9 @@ struct MoodTagChip: View {
         .padding(.vertical, fontSize * 0.2)
         .background(Capsule().fill(tag.tint.opacity(0.28)))
         .overlay(Capsule().stroke(tag.tint.opacity(0.55), lineWidth: 0.5))
+        .overlay {
+            if isHighlighted { Capsule().stroke(Color.yellow.opacity(0.8), lineWidth: 1.5) }
+        }
     }
 }
 
@@ -52,12 +57,17 @@ struct MoodTagChip: View {
 struct MoodTagChips: View {
     let tags: [MoodTag]
     var fontSize: CGFloat = 11
+    /// Search words; tags they match are outlined.
+    var highlightTerms: [EntrySearch.Term] = []
 
     private static let spacing: CGFloat = 4
 
     var body: some View {
         HStack(spacing: Self.spacing) {
-            ForEach(tags) { MoodTagChip(tag: $0, fontSize: fontSize) }
+            ForEach(tags) { tag in
+                MoodTagChip(tag: tag, fontSize: fontSize,
+                            isHighlighted: highlightTerms.contains { EntrySearch.isTag(tag, $0) })
+            }
         }
     }
 

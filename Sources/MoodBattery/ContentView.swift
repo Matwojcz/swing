@@ -22,6 +22,8 @@ struct ContentView: View {
     let tagging: TaggingController
     @State private var showAutoTagAllConfirmation = false
     @State private var cycle = CycleCalendar.empty
+    /// Search matches mood band names in the words of this lens.
+    @AppStorage(Lens.storageKey) private var lens: Lens = .none
     @State private var mainAreaSize: CGSize = .zero
     @State private var gaugeZoom: CGFloat = 1
     /// Height of everything in the main column except the gauge row, measured while the entry fields are showing
@@ -41,7 +43,8 @@ struct ContentView: View {
     private let periodStore = PeriodStore()
     private let importer = MarkdownImporter()
 
-    private var isSearching: Bool { !EntrySearch.words(in: searchText).isEmpty }
+    private var searchTerms: [EntrySearch.Term] { EntrySearch.terms(in: searchText, lens: lens) }
+    private var isSearching: Bool { !searchTerms.isEmpty }
     /// The entries the list and keyboard navigation work on: the search matches while searching, otherwise everything.
     private var visibleEntries: [MoodEntry] { isSearching ? searchMatches : entries }
 
@@ -101,7 +104,7 @@ struct ContentView: View {
                             closeDetailPanel()
                         }
 
-                    EntryDetailPanel(entry: entry, highlightTerms: isSearching ? EntrySearch.words(in: searchText) : [], onClose: {
+                    EntryDetailPanel(entry: entry, highlightTerms: searchTerms, onClose: {
                         closeDetailPanel()
                     }, onDelete: {
                         guard persist({ try store.delete(entry) }) else { return }
@@ -210,6 +213,7 @@ struct ContentView: View {
         }
         .searchable(text: $searchText, prompt: "Search titles and notes")
         .onChange(of: searchText) { runSearch() }
+        .onChange(of: lens) { runSearch() }
         .onSubmit(of: .search) {
             // Return in the search field jumps to the newest match.
             guard let first = searchMatches.first else { return }
@@ -328,12 +332,13 @@ struct ContentView: View {
     /// Refreshes the entries array from the database.
     private func reload() {
         entries = (try? store.fetchAll()) ?? []
-        runSearch()
         reloadCycle()
     }
 
+    /// Reloads the period start days, then the search, whose PMDD band names depend on them.
     private func reloadCycle() {
         cycle = CycleCalendar(localDates: (try? periodStore.fetchStarts()) ?? [])
+        runSearch()
     }
 
     private func setPeriodStart(_ day: Date, _ isStart: Bool) {
@@ -368,7 +373,7 @@ struct ContentView: View {
     /// Swaps a freshly tagged entry into the list, search results and open panel without reloading everything.
     private func applyTagged(_ tagged: MoodEntry) {
         if let i = entries.firstIndex(where: { $0.id == tagged.id }) { entries[i] = tagged }
-        if let i = searchMatches.firstIndex(where: { $0.id == tagged.id }) { searchMatches[i] = tagged }
+        runSearch()
         if selectedEntry?.id == tagged.id { selectedEntry = tagged }
     }
 
@@ -389,9 +394,14 @@ struct ContentView: View {
             + "You can keep using the app while it runs and cancel at any time."
     }
 
-    /// Re-queries the database for the current search text (clearing the matches when not searching).
+    /// Filters the entries for the current search text (clearing the matches when not searching): words in the title
+    /// or note, tags, and the day's band names in the current lens.
     private func runSearch() {
-        searchMatches = isSearching ? ((try? store.search(searchText)) ?? []) : []
+        let terms = searchTerms
+        searchMatches = terms.isEmpty ? [] : entries.filter { entry in
+            let names = MoodState.searchNames(mood: entry.mood, lens: lens, cycle: cycle.position(of: entry.day()))
+            return EntrySearch.matches(entry, terms: terms, names: names)
+        }
     }
 
     /// Processes selected markdown files, parsing diary entries and opening the import preview sheet.

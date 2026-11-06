@@ -8,6 +8,8 @@ struct HistoryListView: View {
     var scrollToEntry: MoodEntry?
     /// Shown when `entries` is empty (e.g. "No matches" while searching).
     var emptyMessage = "No entries yet"
+    /// The search in progress, so rows can show why they matched.
+    var searchTerms: [EntrySearch.Term] = []
 
     @State private var hoverLocation: CGPoint?
     @State private var isHovering = false
@@ -35,6 +37,7 @@ struct HistoryListView: View {
                             ForEach(entries) { entry in
                                 ScaledEntryRow(
                                     entry: entry,
+                                    searchTerms: searchTerms,
                                     isSelected: selectedEntry?.id == entry.id,
                                     hoverLocation: hoverLocation,
                                     isHovering: isHovering,
@@ -90,6 +93,7 @@ struct HistoryListView: View {
 
 private struct ScaledEntryRow: View {
     let entry: MoodEntry
+    let searchTerms: [EntrySearch.Term]
     let isSelected: Bool
     let hoverLocation: CGPoint?
     let isHovering: Bool
@@ -110,7 +114,7 @@ private struct ScaledEntryRow: View {
     }
 
     var body: some View {
-        HistoryEntryRow(entry: entry)
+        HistoryEntryRow(entry: entry, searchTerms: searchTerms)
             .padding(.horizontal, HistoryListView.rowInset)
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)

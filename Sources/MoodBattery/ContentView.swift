@@ -161,7 +161,8 @@ struct ContentView: View {
                     reload()
                 },
                 scrollToEntry: scrollToEntry,
-                emptyMessage: isSearching ? "No matches" : "No entries yet"
+                emptyMessage: isSearching ? "No matches" : "No entries yet",
+                searchTerms: searchTerms
             )
             .frame(maxHeight: .infinity)
             }

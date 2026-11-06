@@ -166,7 +166,7 @@ struct EntryDetailPanel: View {
                     .frame(width: 6, height: 44)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(highlighted(moodLabel, terms: EntrySearch.nameTerms(highlightTerms, names: searchNames)))
+                    Text(EntrySearch.highlighted(moodLabel, terms: EntrySearch.nameTerms(highlightTerms, names: searchNames)))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(MoodColor.color(mood: entry.mood, flavour: entry.flavour))
 
@@ -402,16 +402,9 @@ struct EntryDetailPanel: View {
         }
     }
 
-    /// Returns `text` with every occurrence of the search words given a highlight background. The mood label
-    /// passes only the terms that matched one of the day's band names.
-    private func highlighted(_ text: String, terms: [EntrySearch.Term]? = nil) -> AttributedString {
-        var attributed = AttributedString(text)
-        for range in EntrySearch.ranges(of: terms ?? highlightTerms, in: text) {
-            if let target = Range(range, in: attributed) {
-                attributed[target].backgroundColor = .yellow.opacity(0.35)
-            }
-        }
-        return attributed
+    /// Returns title or note text with the search words that look there highlighted.
+    private func highlighted(_ text: String) -> AttributedString {
+        EntrySearch.highlighted(text, terms: EntrySearch.textTerms(highlightTerms))
     }
 
     // MARK: - Commit

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct HistoryEntryRow: View {
     let entry: MoodEntry
+    /// The search in progress: the row shows why it matched.
+    var searchTerms: [EntrySearch.Term] = []
 
     @State private var isHovered = false
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
@@ -48,7 +50,23 @@ struct HistoryEntryRow: View {
         if let note = entry.note, !note.isEmpty {
             return String(note.prefix(50))
         }
-        return MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens, cycle: cycle.position(of: entry.day()))
+        return moodLabel
+    }
+
+    private var moodLabel: String {
+        MoodState.label(mood: entry.mood, flavour: entry.flavour, lens: lens, cycle: cycle.position(of: entry.day()))
+    }
+
+    /// The line showing why a search found the entry: the matching stretch of the note, else the matching band name.
+    /// A matching tag is outlined among the chips and a matching title highlighted, so they need no line of their own.
+    private var matchLine: AttributedString? {
+        let textTerms = EntrySearch.textTerms(searchTerms)
+        if let excerpt = EntrySearch.excerpt(of: entry.note ?? "", terms: textTerms) {
+            return EntrySearch.highlighted(excerpt, terms: textTerms)
+        }
+        let names = MoodState.searchNames(mood: entry.mood, lens: lens, cycle: cycle.position(of: entry.day()))
+        let nameTerms = EntrySearch.nameTerms(searchTerms, names: names)
+        return nameTerms.isEmpty ? nil : EntrySearch.highlighted(moodLabel, terms: nameTerms)
     }
 
     var body: some View {
@@ -67,12 +85,18 @@ struct HistoryEntryRow: View {
             .frame(width: Self.dateWidth)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(displayTitle)
+                Text(EntrySearch.highlighted(displayTitle, terms: EntrySearch.textTerms(searchTerms)))
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 if !entry.moodTags.isEmpty {
-                    MoodTagChips(tags: entry.moodTags, fontSize: Self.chipFontSize)
+                    MoodTagChips(tags: entry.moodTags, fontSize: Self.chipFontSize, highlightTerms: searchTerms)
+                }
+                if let matchLine {
+                    Text(matchLine)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

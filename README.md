@@ -1,6 +1,6 @@
 # Swing
 
-**v1.2.1**
+**v1.2.2**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time. Labels use neutral everyday words
@@ -74,21 +74,22 @@ your mood over time across week, month, and year scales.
   Parses dates and mood/flavour from field lines (`Mood: 4.8. Flavour: 0.4`,
   one per line or together) or estimates them from the text. Days that
   already have an entry are skipped.
-- **Search** — type words in the toolbar search field to find diary entries.
-  Every word must match, by whole words only (case and accents don't matter,
-  "low" never finds "slow", "lift" never finds "lifted"). A tag name ("lonely")
-  or a mood band name in the current lens ("lifted", "hypomania") finds only
-  days with that tag or band, so "low" means low days, never "a low hum" in a
-  note. Any other word searches titles and notes. Two-word band names count as
-  one: "very low" finds very low days, and "low" finds only low days. In the
-  Bipolar lens "balanced" covers the whole 4 to 6 band, "balanced lifted" and
-  "balanced dipping" just its edges; in the PMDD lens the cycle phases
-  ("premenstrual", "period", "follicular", "luteal") are searchable too.
-  Flavour isn't searched. Matching dots on the diagram get a ring while the
-  rest dim, and the history list narrows to the matches. Each row shows why it
-  matched (an outlined tag, a highlighted title, or the matching line of the
-  note or band name), and the detail panel highlights the same. Up/down arrows
-  step through the matches, Return jumps to the newest one.
+- **Search** — the toolbar search field has two kinds of search, and every
+  word must match. Plain words find tags ("lonely") and mood band names in the
+  current lens ("lifted", "hypomania") and nothing else, so low means low days,
+  never "a low hum" in a note. Words in quote marks ("Dark Souls") find titles
+  and notes only, as a phrase, once the closing quote is typed. The two can be
+  combined: lonely "Iris". Matching
+  is by whole words (case and accents don't matter, "lift" never finds
+  "lifted"). Two-word band names count as one: very low finds very low days,
+  and low finds only low days. In the Bipolar lens balanced covers the whole 4
+  to 6 band, balanced lifted and balanced dipping just its edges; in the PMDD
+  lens the cycle phases (premenstrual, period, follicular, luteal) are
+  searchable too. Flavour isn't searched. Matching dots on the diagram get a
+  ring while the rest dim, and the history list narrows to the matches. Each
+  row shows why it matched (an outlined tag, a highlighted title, or the
+  matching line of the note or band name), and the detail panel highlights the
+  same. Up/down arrows step through the matches, Return jumps to the newest one.
 - **Data export** — export all entries (with their tags) as CSV or JSON from
   the toolbar menu, which also has "Clear all entries". Debug builds add a
   dummy-data seeder there.

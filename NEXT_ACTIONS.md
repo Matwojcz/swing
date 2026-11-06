@@ -10,9 +10,6 @@
 - **Search by meaning.** Later and separate from exact search. Either Gemma writes themes per entry, or a small
   embedding model.
 
-- **Quote marks in search.** `"low"` would search the note text for a word that's otherwise a tag or band, so a day
-  where you wrote "lonely" without the tag can still be found.
-
 ## Decided, ready to start
 
 - **iPhone port.** Plan in `docs/IOS_PORT_PLAN.md` (iPhone 15 Pro, sync through an iCloud Drive folder). Next is

@@ -161,7 +161,7 @@ struct ContentView: View {
                     reload()
                 },
                 scrollToEntry: scrollToEntry,
-                emptyMessage: isSearching ? "No matches" : "No entries yet",
+                emptyMessage: emptyListMessage,
                 searchTerms: searchTerms
             )
             .frame(maxHeight: .infinity)
@@ -212,7 +212,7 @@ struct ContentView: View {
             reload()
             mainFocused = true
         }
-        .searchable(text: $searchText, prompt: "Search titles and notes")
+        .searchable(text: $searchText, prompt: "Tags and moods, or \"words\" in notes")
         .onChange(of: searchText) { runSearch() }
         .onChange(of: lens) { runSearch() }
         .onSubmit(of: .search) {
@@ -395,8 +395,14 @@ struct ContentView: View {
             + "You can keep using the app while it runs and cancel at any time."
     }
 
-    /// Filters the entries for the current search text (clearing the matches when not searching): words in the title
-    /// or note, tags, and the day's band names in the current lens.
+    /// What the empty list says. A search without quote marks only looks at tags and moods, so it points to them.
+    private var emptyListMessage: String {
+        guard isSearching else { return "No entries yet" }
+        return searchTerms.contains(where: \.isQuoted) ? "No matches" : "No matching tags or moods. Use \"quotes\" to search your notes."
+    }
+
+    /// Filters the entries for the current search text (clearing the matches when not searching): tags and the day's
+    /// band names in the current lens, or quoted words in the title or note.
     private func runSearch() {
         let terms = searchTerms
         searchMatches = terms.isEmpty ? [] : entries.filter { entry in

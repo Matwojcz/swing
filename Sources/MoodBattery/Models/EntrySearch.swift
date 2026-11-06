@@ -4,64 +4,76 @@ import Foundation
 /// what gets highlighted. Pure domain logic — no views, no persistence.
 ///
 /// Everything matches by whole words, ignoring case and accents: "low" never finds "slow", and "lift" never finds
-/// "lifted". A query is a list of terms that must all match. A mood word (a tag, or a band name of the current lens,
-/// read as one unit when it has two words: "very low") finds tags and bands only, so "low" means a low day and never
-/// "a low hum" in a note. Any other word finds the title and note only.
+/// "lifted". A query is a list of terms that must all match, and the two kinds never mix. Plain words find tags and
+/// band names of the current lens only (a two-word name such as "very low" is read as one unit), so low means a low
+/// day and never "a low hum" in a note. Words in quote marks find the title and note only, as a phrase.
 enum EntrySearch {
-    /// One search term: its folded words, in order, and whether they name a tag or band.
+    /// One search term: its folded words, in order, and whether they were in quote marks.
     struct Term: Equatable {
         let words: [String]
-        let isMoodWord: Bool
+        let isQuoted: Bool
     }
 
     /// The terms of a query in the given lens; an empty result means "not searching".
     static func terms(in query: String, lens: Lens) -> [Term] {
-        let words = tokens(in: query).map(\.word)
+        // Every second part sits inside quote marks. A quote still open is left out until it closes, so a word
+        // part-way through typing doesn't flash up its own results.
+        var parts = query.replacingOccurrences(of: "[“”]", with: "\"", options: .regularExpression)
+            .components(separatedBy: "\"")
+        if parts.count.isMultiple(of: 2) { parts.removeLast() }
+        return parts.enumerated().flatMap { index, part -> [Term] in
+            let words = tokens(in: part).map(\.word)
+            if index.isMultiple(of: 2) { return plainTerms(words, lens: lens) }
+            return words.isEmpty ? [] : [Term(words: words, isQuoted: true)]
+        }
+    }
+
+    /// Reads plain words as terms: the longest tag or band name at each point, else the word alone, which finds nothing.
+    private static func plainTerms(_ words: [String], lens: Lens) -> [Term] {
         let moodWords = moodWords(lens: lens)
         var terms: [Term] = []
         var i = 0
         while i < words.count {
-            // The longest tag or band name starting here, else a plain word.
-            var term = Term(words: [words[i]], isMoodWord: false)
-            for length in stride(from: min(moodWords.maxLength, words.count - i), through: 1, by: -1)
-            where moodWords.names.contains(Array(words[i..<i + length])) {
-                term = Term(words: Array(words[i..<i + length]), isMoodWord: true)
+            var length = 1
+            for candidate in stride(from: min(moodWords.maxLength, words.count - i), through: 2, by: -1)
+            where moodWords.names.contains(Array(words[i..<i + candidate])) {
+                length = candidate
                 break
             }
-            terms.append(term)
-            i += term.words.count
+            terms.append(Term(words: Array(words[i..<i + length]), isQuoted: false))
+            i += length
         }
         return terms
     }
 
-    /// Whether every term matches the entry: a mood word as one of its tags or one of `names`, the day's names in the
-    /// current lens (`MoodState.searchNames`); any other word in its title or note.
+    /// Whether every term matches the entry: a quoted term in its title or note, a plain one as one of its tags or one
+    /// of `names`, the day's names in the current lens (`MoodState.searchNames`).
     static func matches(_ entry: MoodEntry, terms: [Term], names: [String]) -> Bool {
         guard !terms.isEmpty else { return false }
         let title = tokens(in: entry.title ?? "").map(\.word)
         let note = tokens(in: entry.note ?? "").map(\.word)
         let nameTerms = names.map { tokens(in: $0).map(\.word) }
         return terms.allSatisfy { term in
-            term.isMoodWord ? nameTerms.contains(term.words) || entry.moodTags.contains { isTag($0, term) }
-                            : contains(title, term.words) || contains(note, term.words)
+            term.isQuoted ? contains(title, term.words) || contains(note, term.words)
+                          : nameTerms.contains(term.words) || entry.moodTags.contains { isTag($0, term) }
         }
     }
 
     /// Whether the term is exactly this tag.
     static func isTag(_ tag: MoodTag, _ term: Term) -> Bool {
-        term.isMoodWord && term.words == [tag.rawValue]
+        !term.isQuoted && term.words == [tag.rawValue]
     }
 
     /// The terms that match one of `names` exactly, for highlighting the day's label: a flavour or cycle word in the
     /// label isn't searched, so it isn't highlighted either.
     static func nameTerms(_ terms: [Term], names: [String]) -> [Term] {
         let nameTerms = names.map { tokens(in: $0).map(\.word) }
-        return terms.filter { $0.isMoodWord && nameTerms.contains($0.words) }
+        return terms.filter { !$0.isQuoted && nameTerms.contains($0.words) }
     }
 
     /// The terms that search the title and note, for highlighting there.
     static func textTerms(_ terms: [Term]) -> [Term] {
-        terms.filter { !$0.isMoodWord }
+        terms.filter(\.isQuoted)
     }
 
     /// A short stretch of `text` around the first match, for showing why a search found the entry; nil without a match.

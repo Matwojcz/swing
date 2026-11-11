@@ -19,6 +19,15 @@ struct MoodEntryStore {
         return entry
     }
 
+    /// Writes only the columns that differ between `old` (the entry as the app last read it) and `entry`, so a
+    /// column changed outside the app in the meantime (the MCP server) isn't overwritten with a stale value.
+    /// Throws if the entry no longer exists, rather than inserting it again.
+    func update(_ entry: MoodEntry, from old: MoodEntry) throws {
+        try dbQueue.write { db in
+            _ = try entry.updateChanges(db, from: old)
+        }
+    }
+
     /// Returns one entry, or nil if it doesn't exist (any more).
     func fetch(id: Int64) throws -> MoodEntry? {
         try dbQueue.read { db in
@@ -48,6 +57,16 @@ struct MoodEntryStore {
         try dbQueue.write { db in
             try Self.backfillLocalDates(db)
             return try MoodEntry.order(Column("timestamp").desc).fetchAll(db)
+        }
+    }
+
+    /// The fallback when `fetchAll` fails: reads the entries one by one and leaves out any that can't be read
+    /// (say, a timestamp written from outside in a format the app doesn't know), so one bad row can't hide the diary.
+    func fetchReadable() throws -> (entries: [MoodEntry], unreadable: Int) {
+        try dbQueue.read { db in
+            let ids = try Int64.fetchAll(db, sql: "SELECT id FROM moodEntry ORDER BY timestamp DESC")
+            let entries = ids.compactMap { try? MoodEntry.fetchOne(db, key: $0) }
+            return (entries, ids.count - entries.count)
         }
     }
 

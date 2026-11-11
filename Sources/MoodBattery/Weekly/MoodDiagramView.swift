@@ -36,8 +36,10 @@ struct MoodDiagramView: View {
 
     private var calendar: Calendar { Calendar.current }
 
-    /// Enough pages to reach the oldest entry, and never fewer than the scale's default.
-    private var pageCount: Int {
+    private var pageCount: Int { pageCount(for: scale) }
+
+    /// Enough pages to reach the oldest entry at the given scale, and never fewer than the scale's default.
+    private func pageCount(for scale: DiagramScale) -> Int {
         guard let oldest = entries.map({ $0.day(in: calendar) }).min() else { return scale.pageCount }
         let days = (calendar.dateComponents([.day], from: oldest, to: calendar.startOfDay(for: Date())).day ?? 0) + 1
         return max(scale.pageCount, (days + scale.dayCount - 1) / scale.dayCount)
@@ -108,10 +110,12 @@ struct MoodDiagramView: View {
             let today = calendar.startOfDay(for: Date())
             let target = calendar.startOfDay(for: date)
             let daysBetween = calendar.dateComponents([.day], from: target, to: today).day ?? 0
-            let weekPage = (pageCount - 1) - (daysBetween / 7)
+            // The week scale's own page count: the scale showing now may have fewer pages.
+            let weekPages = pageCount(for: .week)
+            let weekPage = (weekPages - 1) - (daysBetween / 7)
             withAnimation(.easeInOut(duration: 0.25)) {
                 scale = .week
-                currentPage = max(0, min(pageCount - 1, weekPage))
+                currentPage = max(0, min(weekPages - 1, weekPage))
             }
         }
     }

@@ -21,6 +21,8 @@ struct MoodEntryEditor: View {
     var onSaveRequest: ((MoodEntry) -> String?)?
     /// Fired after a successful save so the parent can refresh state and clear the retro-date, etc.
     var onSave: (() -> Void)?
+    /// Drops `targetDate`, so the next entry is logged for today again.
+    var onCancelTargetDate: (() -> Void)?
     /// When set, the gauge and flavour track display this entry's values in read-only mode instead of the editor draft.
     var previewEntry: MoodEntry?
     /// Enlarges the gauge and flavour slider together (1 = design size); the parent caps it.
@@ -103,9 +105,21 @@ struct MoodEntryEditor: View {
                 GrowingTextEditor(text: $note, placeholder: "Note")
 
                 if let targetDate {
-                    Text("Logging for \(Self.dateLabel.string(from: targetDate))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text("Logging for \(Self.dateLabel.string(from: targetDate))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let onCancelTargetDate {
+                            Button(action: onCancelTargetDate) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Log for today instead")
+                            .accessibilityLabel("Log for today instead")
+                        }
+                    }
                 }
 
                 if lens == .pmdd, let onPeriodStartChange {

@@ -12,8 +12,12 @@ struct ContentView: View {
     @State private var importError: String?
     /// Shown after an import that skipped days already in the diary.
     @State private var importNotice: String?
-    /// Shown when a database write fails, so a lost edit doesn't pass for a saved one.
+    /// Shown when a database write or an export fails, so a lost edit doesn't pass for a saved one.
     @State private var saveError: String?
+    /// Shown when the diary, or part of it, can't be read, so a failed load doesn't pass for an empty diary.
+    @State private var loadError: String?
+    /// Entries left out by the last load because they couldn't be read; the alert shows when this changes.
+    @State private var unreadableCount = 0
     @State private var showClearConfirmation = false
     @State private var retroDate: Date?
     @State private var diagramScrollDate: Date?
@@ -65,7 +69,8 @@ struct ContentView: View {
                     }, onSave: {
                         retroDate = nil
                         reload()
-                    }, previewEntry: selectedEntry, gaugeZoom: gaugeZoom, onPeriodStartChange: setPeriodStart)
+                    }, onCancelTargetDate: { retroDate = nil }, previewEntry: selectedEntry, gaugeZoom: gaugeZoom,
+                    onPeriodStartChange: setPeriodStart)
                     MoodDiagramView(entries: entries, onSelectDate: { date in
                         let cal = Calendar.current
                         let day = cal.startOfDay(for: date)
@@ -115,9 +120,8 @@ struct ContentView: View {
                         mainFocused = true
                         reload()
                     }, onUpdate: { updated in
-                        let saved = persist({ try store.save(updated) })
+                        persist({ try store.update(updated, from: entry) })
                         reload()
-                        if saved { selectedEntry = updated }
                     }, onPrevious: {
                         navigateEntry(direction: -1)
                     }, onNext: {
@@ -205,12 +209,20 @@ struct ContentView: View {
                 }
                 return .handled
             }
+            if retroDate != nil {
+                retroDate = nil
+                return .handled
+            }
             return .ignored
         }
         .environment(\.cycleCalendar, cycle)
         .onAppear {
             reload()
             mainFocused = true
+        }
+        // Entries can be written from outside while the app is open (the MCP server), so read them again on return.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            reload()
         }
         .searchable(text: $searchText, prompt: "Tags and moods, or \"words\" in notes")
         .onChange(of: searchText) { runSearch() }
@@ -322,6 +334,14 @@ struct ContentView: View {
         } message: {
             Text(saveError ?? "")
         }
+        .alert("Couldn't load your diary", isPresented: Binding(
+            get: { loadError != nil },
+            set: { if !$0 { loadError = nil } }
+        )) {
+            Button("OK") { loadError = nil }
+        } message: {
+            Text(loadError ?? "")
+        }
         .alert("Delete all entries?", isPresented: $showClearConfirmation) {
             Button("Delete all", role: .destructive) { clearAllData() }
             Button("Cancel", role: .cancel) {}
@@ -330,9 +350,29 @@ struct ContentView: View {
         }
     }
 
-    /// Refreshes the entries array from the database.
+    /// Refreshes the entries array from the database, and the selected entry with it: it may have been changed or
+    /// deleted outside the app. A failed read keeps what was loaded and says so.
     private func reload() {
-        entries = (try? store.fetchAll()) ?? []
+        do {
+            entries = try store.fetchAll()
+            unreadableCount = 0
+        } catch {
+            // One unreadable row mustn't hide the rest: show what can be read and say what was left out.
+            guard let partial = try? store.fetchReadable() else {
+                loadError = "\(error.localizedDescription)\n\nYour entries are still in the database."
+                return
+            }
+            entries = partial.entries
+            if partial.unreadable != unreadableCount {
+                unreadableCount = partial.unreadable
+                loadError = "\(partial.unreadable) \(partial.unreadable == 1 ? "entry" : "entries") couldn't be read and "
+                    + "\(partial.unreadable == 1 ? "is" : "are") left out. The rest of your diary is shown, and nothing was deleted."
+            }
+        }
+        if let selected = selectedEntry {
+            selectedEntry = entries.first { $0.id == selected.id }
+            if selectedEntry == nil { isDetailPanelShown = false }
+        }
         reloadCycle()
     }
 
@@ -495,9 +535,10 @@ struct ContentView: View {
         mainFocused = true
     }
 
-    /// Wipes all mood entries from the database and refreshes the view.
+    /// Wipes all mood entries from the database and refreshes the view, which also closes the open entry.
     private func clearAllData() {
-        try? store.deleteAll()
+        tagging.cancelBatch()
+        persist { try store.deleteAll() }
         reload()
     }
 
@@ -509,8 +550,12 @@ struct ContentView: View {
 
     /// Serialises all entries as JSON and presents a save dialog.
     private func exportJSON() {
-        guard let json = try? ExportService.json(from: entries) else { return }
-        saveFile(content: json, defaultName: "mood-battery-export.json", contentType: .json)
+        do {
+            let json = try ExportService.json(from: entries)
+            saveFile(content: json, defaultName: "mood-battery-export.json", contentType: .json)
+        } catch {
+            saveError = "The export wasn't written: \(error.localizedDescription)"
+        }
     }
 
     /// Opens an NSSavePanel and writes the given content to the user-chosen location.
@@ -520,7 +565,11 @@ struct ContentView: View {
         panel.nameFieldStringValue = defaultName
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? content.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try content.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            saveError = "The export wasn't written: \(error.localizedDescription)"
+        }
     }
 
     /// Saves the reviewed import entries and closes the preview sheet. Days that already have an entry are skipped,

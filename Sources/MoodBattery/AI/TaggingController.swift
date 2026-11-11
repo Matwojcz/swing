@@ -37,6 +37,10 @@ final class TaggingController {
     private var classifier: EntryClassifier?
     /// The single-entry or batch run in progress.
     private var task: Task<Void, Never>?
+    /// Frees the model once it has sat unused for `idleReleaseDelay`.
+    private var idleRelease: Task<Void, Never>?
+    /// The model takes about 3 GB of memory, too much to hold for days in an app that tags now and then.
+    static let idleReleaseDelay: Duration = .seconds(300)
     private let store = MoodEntryStore()
 
     var isBusy: Bool { activity != .idle }
@@ -52,6 +56,7 @@ final class TaggingController {
             defer {
                 activity = .idle
                 task = nil
+                scheduleIdleRelease()
             }
             do {
                 if let tagged = try await tag(entry, keepingManual: false) {
@@ -77,6 +82,7 @@ final class TaggingController {
                 activity = .idle
                 secondsRemaining = nil
                 task = nil
+                scheduleIdleRelease()
             }
             do {
                 _ = try await loadedClassifier()
@@ -117,7 +123,18 @@ final class TaggingController {
 
     /// Frees the model straight away. Only enough while idle: a run in progress holds its own reference.
     func releaseIdleModel() {
+        idleRelease?.cancel()
         classifier = nil
+    }
+
+    /// Restarts the idle countdown; a run that starts in the meantime keeps the model.
+    private func scheduleIdleRelease() {
+        idleRelease?.cancel()
+        idleRelease = Task {
+            try? await Task.sleep(for: Self.idleReleaseDelay)
+            guard !Task.isCancelled, !isBusy else { return }
+            classifier = nil
+        }
     }
 
     /// Classifies and saves one entry, reading its current text first: a batch holds the entries as they were

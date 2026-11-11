@@ -20,7 +20,7 @@ struct TaggingProgressCard: View {
     }
 
     private var detail: String? {
-        if controller.isLoadingModel { return "Only the first run takes this extra step." }
+        if controller.isLoadingModel { return "Only the first tag after a break takes this extra step." }
         guard case .batch(let done, let total) = controller.activity else { return "Reading the note on this Mac." }
         let left = controller.secondsRemaining.map { " · \(Self.durationText($0)) left" } ?? ""
         return "\(done) of \(total)\(left)"

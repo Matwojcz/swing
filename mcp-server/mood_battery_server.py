@@ -14,10 +14,12 @@ Add to your Claude config (claude_desktop_config.json or .mcp.json):
 }
 """
 
+import json
+import math
 import sqlite3
 import os
-from datetime import datetime, timezone
-from pathlib import Path
+from collections import Counter
+from datetime import date, datetime, timedelta, timezone
 try:
     from mcp.server.fastmcp import FastMCP
 except (ImportError, ModuleNotFoundError):
@@ -37,9 +39,15 @@ mcp = FastMCP(
         "Titles are short mood summaries (2–4 words). "
         "Notes are longer diary text. "
         "When the user describes their mood conversationally, extract mood and flavour "
-        "from context and save an entry. Ask to confirm before saving if uncertain."
+        "from context and save an entry. Ask to confirm before saving if uncertain. "
+        "Each day holds one entry: to change a day that already has one, update it. "
+        "Tags are feelings from a fixed list, picked by an on-device model or by hand in the app. "
+        "For a summary of a period, take the numbers from range_summary (never count them yourself) "
+        "and the text from entries_in_range."
     ),
 )
+
+MANUAL_TAG_VERSION = "manual"
 
 
 def get_db() -> sqlite3.Connection:
@@ -47,23 +55,34 @@ def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     columns = [r["name"] for r in conn.execute("PRAGMA table_info(moodEntry)")]
-    if "localDate" not in columns:
+    if "localDate" not in columns or "tagModelVersion" not in columns:
         conn.close()
         raise RuntimeError(
-            "The Swing database has no localDate column yet — open the Swing app once to migrate it."
+            "The Swing database is from an older version of the app — open the Swing app once to migrate it."
         )
     return conn
 
 
-def local_date_for(timestamp: str | None) -> str:
-    """Returns the calendar day (YYYY-MM-DD) an entry belongs to.
+def parse_timestamp(timestamp: str | None) -> tuple[str, str]:
+    """Returns (stored timestamp, calendar day) for a new or changed entry.
 
-    With an explicit timestamp the day is taken as written, so "2026-10-25T23:00:00" belongs to
-    25 Oct whatever the time zone. Without one, it is today's date in the machine's local zone.
+    The stored timestamp is always UTC in the one format the app reads ("YYYY-MM-DD HH:MM:SS.mmm"): anything
+    else in that column stops the app from loading the diary. An explicit timestamp must be ISO 8601; without
+    an offset it is local time. The day is taken as written, so "2026-10-25T23:00:00" belongs to 25 Oct
+    whatever the time zone. Without a timestamp it is now, and today in the machine's local zone.
+    Raises ValueError for text that isn't a date.
     """
     if timestamp:
-        return timestamp[:10]
-    return datetime.now().astimezone().strftime("%Y-%m-%d")
+        written = datetime.fromisoformat(timestamp.strip().replace("Z", "+00:00"))
+    else:
+        written = datetime.now().astimezone()
+    stored = written.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    return stored, written.strftime("%Y-%m-%d")
+
+
+def parse_day(value: str) -> str:
+    """Checks a YYYY-MM-DD day and returns it; raises ValueError otherwise."""
+    return date.fromisoformat(value.strip()).isoformat()
 
 
 def row_to_dict(row: sqlite3.Row) -> dict:
@@ -76,18 +95,47 @@ def row_to_dict(row: sqlite3.Row) -> dict:
         "note": row["note"],
         "timestamp": row["timestamp"],
         "localDate": row["localDate"],
+        "tags": entry_tags(row),
+        "tagSource": tag_source(row),
     }
 
 
-def format_entry(entry: dict) -> str:
-    """Formats a mood entry dict into a multi-line string for display, truncating long notes."""
+def entry_tags(row: sqlite3.Row) -> list[str]:
+    """The entry's tags; an unreadable value counts as none."""
+    try:
+        tags = json.loads(row["tags"] or "[]")
+    except ValueError:
+        return []
+    return [t for t in tags if isinstance(t, str)]
+
+
+def tag_source(row: sqlite3.Row) -> str | None:
+    """Where the tags came from: "by hand", "model", or "model, out of date" when the text changed since."""
+    if not entry_tags(row):
+        return None
+    version = row["tagModelVersion"]
+    if version == MANUAL_TAG_VERSION:
+        return "by hand"
+    return "model" if version else "model, out of date"
+
+
+def tags_line(entry: dict) -> str | None:
+    if not entry["tags"]:
+        return None
+    return f"Tags: {', '.join(entry['tags'])} ({entry['tagSource']})"
+
+
+def format_entry(entry: dict, full_note: bool = False) -> str:
+    """Formats a mood entry dict into a multi-line string for display, truncating long notes unless `full_note`."""
     parts = [f"[{entry['id']}] {entry['localDate'] or '?'} · {entry['timestamp']}"]
     parts.append(f"  Mood: {entry['mood']:.1f}, Flavour: {entry['flavour']:.2f}")
+    if tags_line(entry):
+        parts.append(f"  {tags_line(entry)}")
     if entry["title"]:
         parts.append(f"  Title: {entry['title']}")
     if entry["note"]:
-        preview = entry["note"][:200]
-        if len(entry["note"]) > 200:
+        preview = entry["note"] if full_note else entry["note"][:200]
+        if not full_note and len(entry["note"]) > 200:
             preview += "…"
         parts.append(f"  Note: {preview}")
     return "\n".join(parts)
@@ -108,23 +156,31 @@ def save_mood_entry(
         flavour: Mood flavour 0.0–1.0 (0=happy/euphoric, 1=irritable/agitated; matters above baseline)
         title: Short mood summary, 2–4 words (e.g. "rough morning", "elevated")
         note: Longer diary text
-        timestamp: ISO 8601 timestamp; defaults to now. The entry's day is the date as written
-            (e.g. 2026-10-25T23:00:00 is 25 Oct); with no timestamp it is today in local time.
+        timestamp: ISO 8601 timestamp, local time unless it carries an offset; defaults to now. The entry's
+            day is the date as written (e.g. 2026-10-25T23:00:00 is 25 Oct); with no timestamp it is today.
+
+    A day holds one entry: saving to a day that already has one is refused, use update_mood_entry instead.
     """
     if not 0 <= mood <= 10:
         return "Error: mood must be 0–10"
     if not 0 <= flavour <= 1:
         return "Error: flavour must be 0.0–1.0"
-
-    if timestamp:
-        ts = timestamp
-    else:
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    try:
+        ts, day = parse_timestamp(timestamp)
+    except ValueError:
+        return f"Error: timestamp must be ISO 8601 (e.g. 2026-10-25T21:00:00), got '{timestamp}'"
 
     db = get_db()
+    existing = db.execute("SELECT id FROM moodEntry WHERE localDate = ? ORDER BY id", (day,)).fetchone()
+    if existing:
+        db.close()
+        return (
+            f"Error: {day} already has an entry (#{existing['id']}). "
+            "Each day holds one entry — change it with update_mood_entry."
+        )
     cursor = db.execute(
         "INSERT INTO moodEntry (mood, flavour, title, note, timestamp, localDate) VALUES (?, ?, ?, ?, ?, ?)",
-        (mood, flavour, title, note, ts, local_date_for(timestamp)),
+        (mood, flavour, title, note, ts, day),
     )
     db.commit()
     entry_id = cursor.lastrowid
@@ -149,7 +205,9 @@ def update_mood_entry(
         flavour: New flavour 0.0–1.0
         title: New title
         note: New note text
-        timestamp: New ISO 8601 timestamp (also resets the entry's day to the date as written)
+        timestamp: New ISO 8601 timestamp (also moves the entry to the date as written, if that day is free)
+
+    Changing the title or note marks model-made tags as out of date, as the app does; tags picked by hand stay.
     """
     db = get_db()
     row = db.execute("SELECT * FROM moodEntry WHERE id = ?", (entry_id,)).fetchone()
@@ -172,9 +230,23 @@ def update_mood_entry(
         updates["title"] = title
     if note is not None:
         updates["note"] = note
+    text_changed = any(k in updates and updates[k] != row[k] for k in ("title", "note"))
+    if text_changed and row["tagModelVersion"] != MANUAL_TAG_VERSION:
+        updates["tagModelVersion"] = None
     if timestamp is not None:
-        updates["timestamp"] = timestamp
-        updates["localDate"] = local_date_for(timestamp)
+        try:
+            ts, day = parse_timestamp(timestamp)
+        except ValueError:
+            db.close()
+            return f"Error: timestamp must be ISO 8601 (e.g. 2026-10-25T21:00:00), got '{timestamp}'"
+        taken = db.execute(
+            "SELECT id FROM moodEntry WHERE localDate = ? AND id != ?", (day, entry_id)
+        ).fetchone()
+        if taken:
+            db.close()
+            return f"Error: {day} already has an entry (#{taken['id']}); each day holds one entry."
+        updates["timestamp"] = ts
+        updates["localDate"] = day
 
     if not updates:
         db.close()
@@ -231,6 +303,7 @@ def get_entry(entry_id: int) -> str:
     parts.append(f"Timestamp: {entry['timestamp']}")
     parts.append(f"Mood: {entry['mood']:.1f}")
     parts.append(f"Flavour: {entry['flavour']:.2f}")
+    parts.append(tags_line(entry) or "Tags: (none)")
     parts.append(f"Title: {entry['title'] or '(none)'}")
     parts.append(f"Note: {entry['note'] or '(none)'}")
     return "\n".join(parts)
@@ -326,6 +399,255 @@ def mood_summary(days: int = 7) -> str:
         f"Flavour — avg: {avg_flavour:.2f}\n"
         f"Range: {rows[0]['timestamp']} → {rows[-1]['timestamp']}"
     )
+
+
+# ---------------------------------------------------------------------------------------------------------
+# Periods: the numbers and the text for a summary
+#
+# The bands and the episode rules below repeat the app's, so both tell the same story. Keep them in step with
+# Sources/MoodBattery/Tank/MoodState.swift, Models/MoodScale.swift and Models/EpisodeDetector.swift.
+# ---------------------------------------------------------------------------------------------------------
+
+EVERYDAY_BANDS = ["very low", "low", "dipping", "balanced", "lifted", "high", "very high"]
+BIPOLAR_BANDS = ["severe depression", "moderate depression", "mild depression", "balanced", "hypomania", "mania"]
+
+EPISODE_RULES = {
+    # kind: (threshold, tolerated limit on the other side of baseline, shortest span in days, longest gap bridged)
+    "depressive": (3.5, 5.5, 14, 2),
+    "elevated": (6.5, 4.5, 4, 2),
+}
+EPISODE_MIN_QUALIFYING_SHARE = 0.7
+
+
+def everyday_band(mood: float) -> str:
+    if mood < 1.5:
+        return "very low"
+    if mood < 3:
+        return "low"
+    if mood < 4.5:
+        return "dipping"
+    if mood <= 5.5:
+        return "balanced"
+    if mood < 7:
+        return "lifted"
+    if mood < 8.5:
+        return "high"
+    return "very high"
+
+
+def bipolar_band(mood: float) -> str:
+    """The Bipolar UK Mood Scale band, read at the nearest whole number (halves round up, so 8.5 is mania)."""
+    nearest = math.floor(mood + 0.5)
+    if nearest <= 1:
+        return "severe depression"
+    if nearest == 2:
+        return "moderate depression"
+    if nearest == 3:
+        return "mild depression"
+    if nearest <= 6:
+        return "balanced"
+    if nearest <= 8:
+        return "hypomania"
+    return "mania"
+
+
+def day_moods(rows: list[sqlite3.Row]) -> dict[date, tuple[float, float]]:
+    """Average mood and flavour per logged day."""
+    by_day: dict[date, list[sqlite3.Row]] = {}
+    for row in rows:
+        try:
+            by_day.setdefault(date.fromisoformat(row["localDate"]), []).append(row)
+        except ValueError:
+            continue
+    return {
+        day: (sum(r["mood"] for r in group) / len(group), sum(r["flavour"] for r in group) / len(group))
+        for day, group in by_day.items()
+    }
+
+
+def detect_episodes(moods: dict[date, tuple[float, float]]) -> list[dict]:
+    """Sustained depressive or elevated runs, by the same rules as the app's diagram bands.
+
+    A run starts and ends on a day past the threshold, bridges a couple of unlogged or near-baseline days,
+    stops at a day on the other side, and must be long enough and at least 70% days past the threshold.
+    """
+    if not moods:
+        return []
+    first, last = min(moods), max(moods)
+    days = [first + timedelta(days=i) for i in range((last - first).days + 1)]
+    episodes = []
+    for kind, (threshold, tolerated, min_days, max_gap) in EPISODE_RULES.items():
+        below = kind == "depressive"
+
+        def classify(day: date) -> str:
+            if day not in moods:
+                return "gap"
+            mood = moods[day][0]
+            if below:
+                if mood < threshold:
+                    return "qualifying"
+                return "breaking" if mood > tolerated else "gap"
+            if mood >= threshold:
+                return "qualifying"
+            return "breaking" if mood < tolerated else "gap"
+
+        kinds = [classify(day) for day in days]
+        start = 0
+        while start < len(kinds):
+            if kinds[start] != "qualifying":
+                start += 1
+                continue
+            last_qualifying, qualifying, gap_run = start, 1, 0
+            for j in range(start + 1, len(kinds)):
+                if kinds[j] == "qualifying":
+                    last_qualifying, qualifying, gap_run = j, qualifying + 1, 0
+                elif kinds[j] == "gap":
+                    gap_run += 1
+                    if gap_run > max_gap:
+                        break
+                else:
+                    break
+            span = last_qualifying - start + 1
+            if span >= min_days and qualifying >= EPISODE_MIN_QUALIFYING_SHARE * span:
+                logged = [moods[d][0] for d in days[start:last_qualifying + 1] if d in moods]
+                episodes.append({
+                    "kind": kind,
+                    "start": days[start],
+                    "end": days[last_qualifying],
+                    "days": span,
+                    "logged_days": len(logged),
+                    "average_mood": sum(logged) / len(logged),
+                })
+                start = last_qualifying + 1
+            else:
+                start += 1
+    return sorted(episodes, key=lambda e: e["start"])
+
+
+def format_episode(episode: dict) -> str:
+    return (
+        f"{episode['kind']}: {episode['start']} to {episode['end']} "
+        f"({episode['days']} days, {episode['logged_days']} logged, average mood {episode['average_mood']:.1f})"
+    )
+
+
+def parse_range(start: str, end: str | None) -> tuple[str, str]:
+    """Checks a day range and returns it; `end` defaults to today. Raises ValueError with a readable message."""
+    try:
+        first = parse_day(start)
+        last = parse_day(end) if end else datetime.now().astimezone().strftime("%Y-%m-%d")
+    except ValueError:
+        raise ValueError("Error: dates must be YYYY-MM-DD") from None
+    if first > last:
+        raise ValueError("Error: start must not be after end")
+    return first, last
+
+
+@mcp.tool()
+def entries_in_range(start: str, end: str | None = None, full_notes: bool = True) -> str:
+    """Get every entry between two days, oldest first, with tags and (by default) the whole note.
+
+    Use this for the text behind a summary of a period. For the numbers, use range_summary.
+
+    Args:
+        start: First day, YYYY-MM-DD
+        end: Last day, YYYY-MM-DD, inclusive (default today)
+        full_notes: False cuts each note to 200 characters
+    """
+    try:
+        first, last = parse_range(start, end)
+    except ValueError as error:
+        return str(error)
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM moodEntry WHERE localDate BETWEEN ? AND ? ORDER BY localDate, timestamp", (first, last)
+    ).fetchall()
+    db.close()
+
+    if not rows:
+        return f"No entries from {first} to {last}."
+    entries = [format_entry(row_to_dict(r), full_note=full_notes) for r in rows]
+    return f"{len(rows)} entries from {first} to {last}:\n\n" + "\n\n".join(entries)
+
+
+@mcp.tool()
+def range_summary(start: str, end: str | None = None) -> str:
+    """The numbers for a period, worked out exactly: days logged, mood average and range, days per mood band
+    (everyday words and the Bipolar UK Mood Scale), how often each tag appears, and the episodes that overlap it.
+
+    Quote these numbers in a summary; don't count from the entries. Descriptive only, not a diagnosis.
+
+    Args:
+        start: First day, YYYY-MM-DD
+        end: Last day, YYYY-MM-DD, inclusive (default today)
+    """
+    try:
+        first, last = parse_range(start, end)
+    except ValueError as error:
+        return str(error)
+    db = get_db()
+    all_rows = db.execute("SELECT * FROM moodEntry ORDER BY localDate, timestamp").fetchall()
+    db.close()
+
+    first_day, last_day = date.fromisoformat(first), date.fromisoformat(last)
+    rows = [r for r in all_rows if first <= r["localDate"] <= last]
+    if not rows:
+        return f"No entries from {first} to {last}."
+
+    moods = {d: m for d, m in day_moods(rows).items()}
+    total_days = (last_day - first_day).days + 1
+    values = [m for m, _ in moods.values()]
+    lowest, highest = min(moods, key=lambda d: moods[d][0]), max(moods, key=lambda d: moods[d][0])
+    everyday = Counter(everyday_band(m) for m in values)
+    bipolar = Counter(bipolar_band(m) for m in values)
+    elevated_flavours = [f for m, f in moods.values() if m >= 7]
+    tag_counts = Counter(tag for r in rows for tag in entry_tags(r))
+    untagged = sum(1 for r in rows if not entry_tags(r))
+    # Episodes are found over the whole diary, so one that began before the period is still seen whole.
+    episodes = [e for e in detect_episodes(day_moods(all_rows)) if e["start"] <= last_day and e["end"] >= first_day]
+
+    lines = [
+        f"{first} to {last}: {len(moods)} of {total_days} days logged",
+        f"Mood — average {sum(values) / len(values):.1f}, lowest {moods[lowest][0]:.1f} ({lowest}), "
+        f"highest {moods[highest][0]:.1f} ({highest})",
+        "Days per band, everyday words — " + ", ".join(f"{b}: {everyday[b]}" for b in EVERYDAY_BANDS if everyday[b]),
+        "Days per band, Bipolar UK Mood Scale — " + ", ".join(f"{b}: {bipolar[b]}" for b in BIPOLAR_BANDS if bipolar[b]),
+    ]
+    if elevated_flavours:
+        irritable = sum(1 for f in elevated_flavours if f > 0.65)
+        calm = sum(1 for f in elevated_flavours if f < 0.35)
+        lines.append(
+            f"Flavour on the {len(elevated_flavours)} days at 7 or above — irritable: {irritable}, "
+            f"calm: {calm}, in between: {len(elevated_flavours) - irritable - calm}"
+        )
+    if tag_counts:
+        lines.append("Tags (days) — " + ", ".join(f"{tag}: {n}" for tag, n in tag_counts.most_common()))
+    if untagged:
+        lines.append(f"Entries without tags: {untagged}")
+    if episodes:
+        lines.append("Episodes overlapping this period (same rules as the app's diagram bands):")
+        lines += [f"  {format_episode(e)}" for e in episodes]
+    else:
+        lines.append("No sustained episodes overlap this period.")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def mood_episodes() -> str:
+    """List every sustained mood episode in the diary, oldest first, by the same rules as the bands the app
+    draws on its diagram: a depressive run of at least 14 days below 3.5, or an elevated run of at least
+    4 days at 6.5 or above, allowing a couple of unlogged or near-baseline days in between.
+
+    Descriptive only: these are patterns in the logged numbers, not a diagnosis.
+    """
+    db = get_db()
+    rows = db.execute("SELECT * FROM moodEntry ORDER BY localDate, timestamp").fetchall()
+    db.close()
+
+    episodes = detect_episodes(day_moods(rows))
+    if not episodes:
+        return "No sustained episodes in the diary."
+    return f"{len(episodes)} episodes:\n" + "\n".join(format_episode(e) for e in episodes)
 
 
 if __name__ == "__main__":

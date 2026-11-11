@@ -50,8 +50,10 @@ enum EntrySearch {
     /// of `names`, the day's names in the current lens (`MoodState.searchNames`).
     static func matches(_ entry: MoodEntry, terms: [Term], names: [String]) -> Bool {
         guard !terms.isEmpty else { return false }
-        let title = tokens(in: entry.title ?? "").map(\.word)
-        let note = tokens(in: entry.note ?? "").map(\.word)
+        // The text is only split into words when a quoted term will look at it.
+        let searchesText = terms.contains(where: \.isQuoted)
+        let title = searchesText ? tokens(in: entry.title ?? "").map(\.word) : []
+        let note = searchesText ? tokens(in: entry.note ?? "").map(\.word) : []
         let nameTerms = names.map { tokens(in: $0).map(\.word) }
         return terms.allSatisfy { term in
             term.isQuoted ? contains(title, term.words) || contains(note, term.words)
@@ -96,6 +98,7 @@ enum EntrySearch {
     /// Every whole-word occurrence of every term in `text`, for highlighting. A two-word term spans both words and
     /// whatever sits between them ("balanced, lifted").
     static func ranges(of terms: [Term], in text: String) -> [Range<String.Index>] {
+        guard !terms.isEmpty else { return [] }
         let words = tokens(in: text)
         var result: [Range<String.Index>] = []
         for term in terms.map(\.words) where !term.isEmpty && term.count <= words.count {

@@ -1,6 +1,6 @@
 # Swing
 
-**v1.2.2**
+**v1.2.3**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time. Labels use neutral everyday words
@@ -63,13 +63,15 @@ your mood over time across week, month, and year scales.
   hand are marked with a small hand icon, and "Auto-tag all" leaves them
   alone; the panel's own Auto-tag button still replaces them if asked.
   The model never sees the mood rating, so tags stay an independent reading
-  of the text.
+  of the text. It takes about 3 GB of memory while loaded and is freed after
+  five minutes without tagging.
 - **Keyboard navigation** — up/down arrows flick through entries, ESC
   closes the detail panel or cancels an edit. The selected entry is shown
   on the gauge, the diagram scrolls to its week, and its dot gets a ring
   that fades between entries.
 - **Retrospective entries** — tap an empty date in the week diagram to log
-  for a past day. One entry per day is enforced.
+  for a past day; the "Logging for…" line has a cancel button, and ESC
+  cancels it too. One entry per day is enforced.
 - **Markdown import** — import `.md` diary files with a preview sheet.
   Parses dates and mood/flavour from field lines (`Mood: 4.8. Flavour: 0.4`,
   one per line or together) or estimates them from the text. Days that
@@ -94,7 +96,10 @@ your mood over time across week, month, and year scales.
   the toolbar menu, which also has "Clear all entries". Debug builds add a
   dummy-data seeder there.
 - **MCP server** — Python server for Claude integration (log, query,
-  update, delete entries).
+  update, delete entries; exact numbers, tags and episodes for a period).
+  The app reads the diary again whenever you return to it, and an edit
+  saves only the field that changed, so changes made through the server
+  while Swing is open are picked up and never overwritten.
 
 ## Requirements
 
@@ -174,11 +179,28 @@ Tools:
 | `save_mood_entry`     | `mood`, `flavour`, `title?`, `note?`, `timestamp?`     | Log an entry (defaults to now)           |
 | `update_mood_entry`   | `entry_id`, plus any of the fields above               | Change fields of an entry                |
 | `list_recent_entries` | `count?` (default 10, max 100)                         | Newest entries first                     |
-| `get_entry`           | `entry_id`                                             | Full details of one entry                |
+| `get_entry`           | `entry_id`                                             | Full details of one entry, with tags     |
 | `delete_entry`        | `entry_id`                                             | Delete an entry                          |
 | `search_entries`      | `query`, `limit?` (default 20)                         | Search titles and notes                  |
 | `entries_for_date`    | `date` (`YYYY-MM-DD`)                                  | All entries for a day                    |
 | `mood_summary`        | `days?` (default 7)                                    | Average, range and count over a period   |
+| `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |
+| `range_summary`       | `start`, `end?` (default today)                        | Exact numbers for a period (see below)   |
+| `mood_episodes`       | none                                                   | Every sustained episode in the diary     |
+
+The server follows the app's rules. A day holds one entry, so saving to a day
+that already has one is refused. Timestamps must be ISO 8601 (local time
+unless they carry an offset) and are stored in the one format the app reads.
+Changing a title or note marks model-made tags as out of date. Entries are
+shown with their tags and where the tags came from (model, by hand, or out of
+date).
+
+`range_summary` gives the numbers a written summary should quote, worked out
+rather than estimated: days logged, mood average and range, days per band (in
+everyday words and on the Bipolar UK Mood Scale), tag counts, and the episodes
+that overlap the period. Episodes and bands use the same rules as the app
+(`MoodState`, `MoodScale`, `EpisodeDetector`), repeated in Python: change them
+in both places.
 
 The server needs the app to have run once so the database exists and is migrated.
 

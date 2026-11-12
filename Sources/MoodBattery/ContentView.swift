@@ -235,6 +235,8 @@ struct ContentView: View {
         // Entries can be written from outside while the app is open (the MCP server), so read them again on return.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             reload()
+            // The app can stay open for days: take the day's backup when it's next used.
+            DatabaseManager.shared.backUpIfDue()
         }
         .searchable(text: $searchText, prompt: "Tags and moods, or \"words\" in notes")
         .onChange(of: searchText) { runSearch() }
@@ -265,6 +267,7 @@ struct ContentView: View {
                 Menu {
                     Button("Export as CSV") { exportCSV() }
                     Button("Export as JSON") { exportJSON() }
+                    Button("Show backups in Finder") { showBackups() }
                     Divider()
                     #if DEBUG
                     Button("Seed 6 months of dummy data") { seedDummyData() }
@@ -569,6 +572,13 @@ struct ContentView: View {
         tagging.cancelBatch()
         persist { try store.deleteAll() }
         reload()
+    }
+
+    /// Opens the folder of daily database backups.
+    private func showBackups() {
+        guard let directory = DatabaseManager.shared.backupDirectory else { return }
+        DatabaseManager.shared.backUpIfDue()
+        NSWorkspace.shared.activateFileViewerSelecting([directory])
     }
 
     /// Serialises all entries as CSV and presents a save dialog.

@@ -164,6 +164,13 @@ migrated by GRDB on launch. Table `moodEntry`:
 | `tags`      | text     | JSON array of AI tag names, `[]` when untagged           |
 | `tagModelVersion` | text | Model and prompt version behind `tags`, `manual` if picked by hand; null if never tagged or out of date |
 
+Swing copies the database once a day into `Backups/` next to it
+(`moodbattery-yyyy-MM-dd.sqlite`, taken on launch and when you return to the
+app, before any migration) and keeps the last 14. "Show backups in Finder" in
+the toolbar menu opens the folder. To restore one, quit Swing and copy it over
+`moodbattery.sqlite`. Export leaves out period days and markers, so the
+backups are the only complete copies.
+
 Table `periodStart` holds one `localDate` (`yyyy-MM-dd`, primary key) per
 logged period start, for the PMDD lens. Table `marker` holds the diagram
 markers: `id`, `localDate`, `label`, and `kind` (`medication`,

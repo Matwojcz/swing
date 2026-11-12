@@ -5,12 +5,20 @@ final class DatabaseManager {
     static let shared = try! DatabaseManager()
 
     let dbQueue: DatabaseQueue
+    /// Where the daily backups go: `Backups` next to the app's own database, nil for a database at a given path.
+    let backupDirectory: URL?
 
-    /// Opens (or creates) the SQLite database at the given path, defaulting to the app's Application Support directory, and runs pending migrations.
+    /// Daily backups kept; older ones are deleted.
+    static let backupsToKeep = 14
+
+    /// Opens (or creates) the SQLite database at the given path, defaulting to the app's Application Support directory,
+    /// backs up the app's own database once a day, and runs pending migrations (after the backup, so a migration that
+    /// goes wrong has a copy from before it).
     init(path: String? = nil) throws {
         let dbPath: String
         if let path {
             dbPath = path
+            backupDirectory = nil
         } else {
             let fileManager = FileManager.default
             let appSupportURL = try fileManager.url(
@@ -22,10 +30,43 @@ final class DatabaseManager {
             let directoryURL = appSupportURL.appendingPathComponent("MoodBattery", isDirectory: true)
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
             dbPath = directoryURL.appendingPathComponent("moodbattery.sqlite").path
+            backupDirectory = directoryURL.appendingPathComponent("Backups", isDirectory: true)
         }
 
         dbQueue = try DatabaseQueue(path: dbPath)
+        backUpIfDue()
         try Self.migrator.migrate(dbQueue)
+    }
+
+    /// Copies the database to `Backups/moodbattery-yyyy-MM-dd.sqlite` unless today's copy exists, then keeps only the
+    /// newest `backupsToKeep`. Export leaves out period days and markers and can't be read back in, so these copies are
+    /// the way back from a bad edit, a sync problem or a migration. Cheap when today's copy exists, so call it freely.
+    /// A failed backup never stops the app: it's reported in the console and tried again next time.
+    func backUpIfDue(today: Date = Date()) {
+        guard let backupDirectory else { return }
+        let fileManager = FileManager.default
+        do {
+            try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+            let target = backupDirectory.appendingPathComponent("moodbattery-\(MoodEntry.localDateString(for: today)).sqlite")
+            guard !fileManager.fileExists(atPath: target.path) else { return }
+
+            // Written under another name and moved into place, so a half-written copy never passes for a backup.
+            let partial = backupDirectory.appendingPathComponent("in-progress.sqlite")
+            try? fileManager.removeItem(at: partial)
+            let destination = try DatabaseQueue(path: partial.path)
+            try dbQueue.backup(to: destination)
+            try destination.close()
+            try fileManager.moveItem(at: partial, to: target)
+
+            let backups = try fileManager.contentsOfDirectory(at: backupDirectory, includingPropertiesForKeys: nil)
+                .filter { $0.lastPathComponent.hasPrefix("moodbattery-") && $0.pathExtension == "sqlite" }
+                .sorted { $0.lastPathComponent > $1.lastPathComponent }
+            for old in backups.dropFirst(Self.backupsToKeep) {
+                try? fileManager.removeItem(at: old)
+            }
+        } catch {
+            print("[DatabaseManager] Backup failed: \(error)")
+        }
     }
 
     private static var migrator: DatabaseMigrator {

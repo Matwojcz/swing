@@ -88,6 +88,15 @@ final class DatabaseManager {
             }
         }
 
+        migrator.registerMigration("createMarker") { db in
+            try db.create(table: "marker") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("localDate", .text).notNull().indexed()
+                t.column("label", .text).notNull()
+                t.column("kind", .text).notNull()
+            }
+        }
+
         return migrator
     }
 }

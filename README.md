@@ -52,6 +52,13 @@ your mood over time across week, month, and year scales.
   Bipolar lens, "Day 3 in the hypomania range"). It fills in on the day it
   becomes an episode, or disappears without a trace if the run fades. It
   only counts days: no alerts, advice or predictions.
+- **Markers** — mark a day by hand (medication change, appointment, or
+  anything else) from the flag button in the entry panel, or by
+  right-clicking a day on the week scale. A marker is a dashed line with a
+  small labelled flag, at every scale (the year scale shows just the icon).
+  Clicking the flag shows the 30 days before and the days from the marker
+  on: average mood, days logged, days at 6.5 or above and below 3.5. It
+  describes what changed around the date, never why. Edit or delete it there.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, note, or the tags). Shows the
   entry's tags, an Auto-tag button, and (in the PMDD lens) a "Period started
@@ -158,7 +165,9 @@ migrated by GRDB on launch. Table `moodEntry`:
 | `tagModelVersion` | text | Model and prompt version behind `tags`, `manual` if picked by hand; null if never tagged or out of date |
 
 Table `periodStart` holds one `localDate` (`yyyy-MM-dd`, primary key) per
-logged period start, for the PMDD lens.
+logged period start, for the PMDD lens. Table `marker` holds the diagram
+markers: `id`, `localDate`, `label`, and `kind` (`medication`,
+`appointment` or `other`).
 
 ## MCP server (optional)
 
@@ -193,6 +202,7 @@ Tools:
 | `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |
 | `range_summary`       | `start`, `end?` (default today)                        | Exact numbers for a period (see below)   |
 | `mood_episodes`       | none                                                   | Every episode, and a run forming now     |
+| `list_markers`        | none                                                   | The markers placed on the diagram        |
 
 The server follows the app's rules. A day holds one entry, so saving to a day
 that already has one is refused. Timestamps must be ISO 8601 (local time
@@ -204,7 +214,8 @@ date).
 `range_summary` gives the numbers a written summary should quote, worked out
 rather than estimated: days logged, mood average and range, days per band (in
 everyday words and on the Bipolar UK Mood Scale), tag counts, and the episodes
-that overlap the period. Episodes and bands use the same rules as the app
+that overlap the period, and the markers in it (`entries_in_range` lists them
+too). Episodes and bands use the same rules as the app
 (`MoodState`, `MoodScale`, `EpisodeDetector`), repeated in Python: change them
 in both places.
 
@@ -242,7 +253,7 @@ Sources/MoodBattery/
   Entry/                     Gauge editor, text fields
   Tank/                      Gauge view, spark effects, mood colors
   History/                   Entry list, detail panel
-  Weekly/                    Mood diagram (week/month/year)
+  Weekly/                    Mood diagram (week/month/year), markers
   Persistence/               SQLite store, database manager
   Import/                    Markdown diary importer
   Export/                    CSV and JSON export

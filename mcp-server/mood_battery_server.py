@@ -616,6 +616,19 @@ def format_episode(episode: dict) -> str:
     )
 
 
+def markers_between(db: sqlite3.Connection, first: str, last: str) -> list[sqlite3.Row]:
+    """Markers placed by hand on the diagram between two days; none when the app hasn't created the table yet."""
+    if not db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'marker'").fetchone():
+        return []
+    return db.execute(
+        "SELECT * FROM marker WHERE localDate BETWEEN ? AND ? ORDER BY localDate, id", (first, last)
+    ).fetchall()
+
+
+def format_marker(marker: sqlite3.Row) -> str:
+    return f"{marker['localDate']} · {marker['kind']}: {marker['label']}"
+
+
 def parse_range(start: str, end: str | None) -> tuple[str, str]:
     """Checks a day range and returns it; `end` defaults to today. Raises ValueError with a readable message."""
     try:
@@ -647,12 +660,16 @@ def entries_in_range(start: str, end: str | None = None, full_notes: bool = True
     rows = db.execute(
         "SELECT * FROM moodEntry WHERE localDate BETWEEN ? AND ? ORDER BY localDate, timestamp", (first, last)
     ).fetchall()
+    markers = markers_between(db, first, last)
     db.close()
 
     if not rows:
         return f"No entries from {first} to {last}."
     entries = [format_entry(row_to_dict(r), full_note=full_notes) for r in rows]
-    return f"{len(rows)} entries from {first} to {last}:\n\n" + "\n\n".join(entries)
+    header = f"{len(rows)} entries from {first} to {last}:"
+    if markers:
+        header += "\nMarkers in this period: " + "; ".join(format_marker(m) for m in markers)
+    return header + "\n\n" + "\n\n".join(entries)
 
 
 @mcp.tool()
@@ -672,6 +689,7 @@ def range_summary(start: str, end: str | None = None) -> str:
         return str(error)
     db = get_db()
     all_rows = db.execute("SELECT * FROM moodEntry ORDER BY localDate, timestamp").fetchall()
+    markers = markers_between(db, first, last)
     db.close()
 
     first_day, last_day = date.fromisoformat(first), date.fromisoformat(last)
@@ -717,6 +735,9 @@ def range_summary(start: str, end: str | None = None) -> str:
     forming = forming_run(day_moods(all_rows))
     if forming and forming["start"] <= last_day and forming["end"] >= first_day:
         lines.append(format_forming(forming))
+    if markers:
+        lines.append("Markers placed by hand in this period:")
+        lines += [f"  {format_marker(m)}" for m in markers]
     return "\n".join(lines)
 
 
@@ -740,6 +761,19 @@ def mood_episodes() -> str:
     if forming:
         lines.append(format_forming(forming))
     return "\n".join(lines)
+
+
+@mcp.tool()
+def list_markers() -> str:
+    """List the markers placed by hand on the app's diagram (medication changes, appointments, other events),
+    oldest first. They are the user's own record of what happened when, not inferred.
+    """
+    db = get_db()
+    markers = markers_between(db, "0000-01-01", "9999-12-31")
+    db.close()
+    if not markers:
+        return "No markers on the diagram."
+    return f"{len(markers)} markers:\n" + "\n".join(format_marker(m) for m in markers)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The small card shown when hovering a dot on the diagram: the day's mood and tags, and a line when the day stands
-/// out ("Lowest since 26 Oct"). On the year scale a dot is a week: its average and its lowest and highest day.
+/// out ("Lowest since 26 Oct", or "As low as 24 Aug" when an earlier day matched it). On the year scale a dot is a week: its average and its lowest and highest day.
 struct DayHoverCard: View {
     let date: Date
     /// On the year scale a dot is a week's average.
@@ -68,18 +68,26 @@ struct DayHoverCard: View {
         .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
     }
 
-    /// "Lowest since 26 Oct", "Highest since you started logging".
+    /// "Lowest since 26 Oct", "As low as 24 Aug", "Highest since you started logging".
     private func recordText(_ record: DayRecord.Result) -> String {
+        if let tie = record.tiedWith {
+            return "\(record.kind == .lowest ? "As low as" : "As high as") \(shortDate(tie))"
+        }
         let word = record.kind == .lowest ? "Lowest" : "Highest"
         guard let since = record.since else { return "\(word) since you started logging" }
-        let sameYear = Calendar.current.isDate(since, equalTo: date, toGranularity: .year)
-        return "\(word) since \((sameYear ? Self.sinceFormatter : Self.sinceFormatterWithYear).string(from: since))"
+        return "\(word) since \(shortDate(since))"
+    }
+
+    /// "24 Aug", with the year when it isn't the hovered day's.
+    private func shortDate(_ day: Date) -> String {
+        let sameYear = Calendar.current.isDate(day, equalTo: date, toGranularity: .year)
+        return (sameYear ? Self.sinceFormatter : Self.sinceFormatterWithYear).string(from: day)
     }
 }
 
 #Preview {
     DayHoverCard(date: Date(), isWeek: false, mood: 3.6, label: "dipping", tags: [.low, .foggy, .flat],
-                 record: .init(kind: .lowest, since: Calendar.current.date(byAdding: .day, value: -20, to: Date())))
+                 record: .init(kind: .lowest, since: Calendar.current.date(byAdding: .day, value: -20, to: Date()), tiedWith: nil))
         .frame(width: 230)
         .padding()
 }

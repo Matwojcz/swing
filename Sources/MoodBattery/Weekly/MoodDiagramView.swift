@@ -576,7 +576,21 @@ struct MoodDiagramView: View {
     /// Maps a mood value to its vertical position (0=top/hype, max=bottom/depressive) within the canvas height.
     private func y(for mood: Double, height: CGFloat) -> CGFloat {
         let usable = height - verticalPadding * 2
-        return verticalPadding + CGFloat(1 - MoodScale.normalized(mood)) * usable
+        let drawn = scale == .week ? Self.weekStretched(mood) : mood
+        return verticalPadding + CGFloat(1 - MoodScale.normalized(drawn)) * usable
+    }
+
+    /// The week scale spreads 7 days over the width the month scale uses for 30, so the same day-to-day moves look
+    /// far gentler there. It draws distances from baseline this many times larger to read like the other scales.
+    static let weekStretch = 1.5
+
+    /// Stretches `mood`'s distance from baseline by `weekStretch`, easing off towards the ends so 0 and 10 stay at the
+    /// edges and extreme days stay apart instead of clipping. Order is kept: a higher mood is always drawn higher. The
+    /// diagram has no scale, so only the drawing changes; values, bands and the hover card are untouched.
+    static func weekStretched(_ mood: Double) -> Double {
+        let half = (MoodScale.max - MoodScale.min) / 2
+        let distance = (mood - MoodScale.baseline) / half
+        return MoodScale.baseline + half * tanh(weekStretch * distance) / tanh(weekStretch)
     }
 
     // MARK: - Drawing
@@ -708,6 +722,20 @@ struct MoodDiagramView: View {
             return (pos: pos, color: MoodColor.color(mood: dp.mood, flavour: dp.flavour), dayIndex: dp.dayIndex)
         }
         guard !plotted.isEmpty else { return }
+
+        // The year scale's points are weekly averages: a faint bar from each week's lowest to highest day keeps the
+        // real range in view, so the year doesn't look calmer than the weeks it's made of.
+        if scale == .year {
+            for dp in points {
+                guard let low = dp.low, let high = dp.high, high > low else { continue }
+                let px = x(forDayIndex: dp.dayIndex, totalDays: totalDays, width: size.width)
+                var bar = Path()
+                bar.move(to: CGPoint(x: px, y: y(for: high, height: size.height)))
+                bar.addLine(to: CGPoint(x: px, y: y(for: low, height: size.height)))
+                context.stroke(bar, with: .color(MoodColor.color(mood: dp.mood, flavour: dp.flavour).opacity(0.35)),
+                               style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            }
+        }
 
         if plotted.count > 1 {
             for i in 1..<plotted.count {

@@ -417,6 +417,8 @@ EPISODE_RULES = {
     "elevated": (6.5, 4.5, 4, 2),
 }
 EPISODE_MIN_QUALIFYING_SHARE = 0.7
+# A run still open today is reported as forming from this many days, before it is long enough to be an episode.
+FORMING_DAYS = {"depressive": 7, "elevated": 2}
 
 
 def everyday_band(mood: float) -> str:
@@ -463,6 +465,89 @@ def day_moods(rows: list[sqlite3.Row]) -> dict[date, tuple[float, float]]:
         day: (sum(r["mood"] for r in group) / len(group), sum(r["flavour"] for r in group) / len(group))
         for day, group in by_day.items()
     }
+
+
+def classify_day(moods: dict[date, tuple[float, float]], day: date, kind: str) -> str:
+    """How a day relates to a run of `kind`: "qualifying", "gap" (unlogged or near baseline) or "breaking"."""
+    threshold, tolerated, _, _ = EPISODE_RULES[kind]
+    if day not in moods:
+        return "gap"
+    mood = moods[day][0]
+    if kind == "depressive":
+        if mood < threshold:
+            return "qualifying"
+        return "breaking" if mood > tolerated else "gap"
+    if mood >= threshold:
+        return "qualifying"
+    return "breaking" if mood < tolerated else "gap"
+
+
+def make_run(moods: dict[date, tuple[float, float]], days: list[date], kind: str, start: int, end: int) -> dict:
+    logged = [moods[d][0] for d in days[start:end + 1] if d in moods]
+    return {
+        "kind": kind,
+        "start": days[start],
+        "end": days[end],
+        "days": end - start + 1,
+        "logged_days": len(logged),
+        "average_mood": sum(logged) / len(logged),
+    }
+
+
+def forming_run(moods: dict[date, tuple[float, float]], today: date | None = None) -> dict | None:
+    """The run still open today that is on its way to an episode but not long enough yet, as in the app.
+
+    Days since the last logged one count as gaps. None when nothing is forming, including when the open run is
+    already a full episode (detect_episodes reports that).
+    """
+    if not moods:
+        return None
+    today = today or datetime.now().astimezone().date()
+    first = min(moods)
+    if first > today:
+        return None
+    days = [first + timedelta(days=i) for i in range((today - first).days + 1)]
+    for kind in ("elevated", "depressive"):
+        _, _, min_days, max_gap = EPISODE_RULES[kind]
+        kinds = [classify_day(moods, day, kind) for day in days]
+        start = 0
+        while start < len(kinds):
+            if kinds[start] != "qualifying":
+                start += 1
+                continue
+            last_qualifying, qualifying, gap_run, ended = start, 1, 0, False
+            for j in range(start + 1, len(kinds)):
+                if kinds[j] == "qualifying":
+                    last_qualifying, qualifying, gap_run = j, qualifying + 1, 0
+                elif kinds[j] == "gap":
+                    gap_run += 1
+                    if gap_run > max_gap:
+                        ended = True
+                        break
+                else:
+                    ended = True
+                    break
+            span = last_qualifying - start + 1
+            share_met = qualifying >= EPISODE_MIN_QUALIFYING_SHARE * span
+            if not ended:
+                if span >= min_days and share_met:
+                    break
+                if span >= FORMING_DAYS[kind] and share_met:
+                    return make_run(moods, days, kind, start, last_qualifying)
+                start += 1
+            else:
+                start = last_qualifying + 1 if span >= min_days and share_met else start + 1
+    return None
+
+
+def format_forming(run: dict) -> str:
+    """Names the state and counts days, as the app's caption does, with no target number."""
+    word = "an elevated run" if run["kind"] == "elevated" else "a low run"
+    return (
+        f"Forming now: day {run['days']} of {word}, from {run['start']} "
+        f"({run['logged_days']} days logged, average mood {run['average_mood']:.1f}). "
+        "Not an episode yet; it only counts days."
+    )
 
 
 def detect_episodes(moods: dict[date, tuple[float, float]]) -> list[dict]:
@@ -531,6 +616,19 @@ def format_episode(episode: dict) -> str:
     )
 
 
+def markers_between(db: sqlite3.Connection, first: str, last: str) -> list[sqlite3.Row]:
+    """Markers placed by hand on the diagram between two days; none when the app hasn't created the table yet."""
+    if not db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'marker'").fetchone():
+        return []
+    return db.execute(
+        "SELECT * FROM marker WHERE localDate BETWEEN ? AND ? ORDER BY localDate, id", (first, last)
+    ).fetchall()
+
+
+def format_marker(marker: sqlite3.Row) -> str:
+    return f"{marker['localDate']} · {marker['kind']}: {marker['label']}"
+
+
 def parse_range(start: str, end: str | None) -> tuple[str, str]:
     """Checks a day range and returns it; `end` defaults to today. Raises ValueError with a readable message."""
     try:
@@ -562,12 +660,16 @@ def entries_in_range(start: str, end: str | None = None, full_notes: bool = True
     rows = db.execute(
         "SELECT * FROM moodEntry WHERE localDate BETWEEN ? AND ? ORDER BY localDate, timestamp", (first, last)
     ).fetchall()
+    markers = markers_between(db, first, last)
     db.close()
 
     if not rows:
         return f"No entries from {first} to {last}."
     entries = [format_entry(row_to_dict(r), full_note=full_notes) for r in rows]
-    return f"{len(rows)} entries from {first} to {last}:\n\n" + "\n\n".join(entries)
+    header = f"{len(rows)} entries from {first} to {last}:"
+    if markers:
+        header += "\nMarkers in this period: " + "; ".join(format_marker(m) for m in markers)
+    return header + "\n\n" + "\n\n".join(entries)
 
 
 @mcp.tool()
@@ -587,6 +689,7 @@ def range_summary(start: str, end: str | None = None) -> str:
         return str(error)
     db = get_db()
     all_rows = db.execute("SELECT * FROM moodEntry ORDER BY localDate, timestamp").fetchall()
+    markers = markers_between(db, first, last)
     db.close()
 
     first_day, last_day = date.fromisoformat(first), date.fromisoformat(last)
@@ -629,6 +732,12 @@ def range_summary(start: str, end: str | None = None) -> str:
         lines += [f"  {format_episode(e)}" for e in episodes]
     else:
         lines.append("No sustained episodes overlap this period.")
+    forming = forming_run(day_moods(all_rows))
+    if forming and forming["start"] <= last_day and forming["end"] >= first_day:
+        lines.append(format_forming(forming))
+    if markers:
+        lines.append("Markers placed by hand in this period:")
+        lines += [f"  {format_marker(m)}" for m in markers]
     return "\n".join(lines)
 
 
@@ -636,7 +745,8 @@ def range_summary(start: str, end: str | None = None) -> str:
 def mood_episodes() -> str:
     """List every sustained mood episode in the diary, oldest first, by the same rules as the bands the app
     draws on its diagram: a depressive run of at least 14 days below 3.5, or an elevated run of at least
-    4 days at 6.5 or above, allowing a couple of unlogged or near-baseline days in between.
+    4 days at 6.5 or above, allowing a couple of unlogged or near-baseline days in between. Also reports a run
+    that is forming now (2 elevated or 7 low days in, still open today), as the app's dashed band does.
 
     Descriptive only: these are patterns in the logged numbers, not a diagnosis.
     """
@@ -644,10 +754,26 @@ def mood_episodes() -> str:
     rows = db.execute("SELECT * FROM moodEntry ORDER BY localDate, timestamp").fetchall()
     db.close()
 
-    episodes = detect_episodes(day_moods(rows))
-    if not episodes:
-        return "No sustained episodes in the diary."
-    return f"{len(episodes)} episodes:\n" + "\n".join(format_episode(e) for e in episodes)
+    moods = day_moods(rows)
+    episodes = detect_episodes(moods)
+    forming = forming_run(moods)
+    lines = [f"{len(episodes)} episodes:"] + [format_episode(e) for e in episodes] if episodes else ["No sustained episodes in the diary."]
+    if forming:
+        lines.append(format_forming(forming))
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def list_markers() -> str:
+    """List the markers placed by hand on the app's diagram (medication changes, appointments, other events),
+    oldest first. They are the user's own record of what happened when, not inferred.
+    """
+    db = get_db()
+    markers = markers_between(db, "0000-01-01", "9999-12-31")
+    db.close()
+    if not markers:
+        return "No markers on the diagram."
+    return f"{len(markers)} markers:\n" + "\n".join(format_marker(m) for m in markers)
 
 
 if __name__ == "__main__":

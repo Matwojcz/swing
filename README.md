@@ -46,6 +46,19 @@ your mood over time across week, month, and year scales.
   following DSM-5 bipolar II durations. Runs tolerate a couple of unlogged or
   near-baseline days, but a logged day on the opposite side ends them, and at
   least 70% of the span must be qualifying days.
+  A run that is still open today but not long enough yet shows as a dashed,
+  unfilled band, from 2 days for an elevated run or 7 for a low one, with a
+  caption under the diagram such as "Day 3 of an elevated run" (in the
+  Bipolar lens, "Day 3 in the hypomania range"). It fills in on the day it
+  becomes an episode, or disappears without a trace if the run fades. It
+  only counts days: no alerts, advice or predictions.
+- **Markers** — mark a day by hand (medication change, appointment, or
+  anything else) from the flag button in the entry panel, or by
+  right-clicking a day on the week scale. A marker is a dashed line with a
+  small labelled flag, at every scale (the year scale shows just the icon).
+  Clicking the flag shows the 30 days before and the days from the marker
+  on: average mood, days logged, days at 6.5 or above and below 3.5. It
+  describes what changed around the date, never why. Edit or delete it there.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, note, or the tags). Shows the
   entry's tags, an Auto-tag button, and (in the PMDD lens) a "Period started
@@ -151,8 +164,23 @@ migrated by GRDB on launch. Table `moodEntry`:
 | `tags`      | text     | JSON array of AI tag names, `[]` when untagged           |
 | `tagModelVersion` | text | Model and prompt version behind `tags`, `manual` if picked by hand; null if never tagged or out of date |
 
+Swing copies the database once a day into `Backups/` next to it
+(`moodbattery-yyyy-MM-dd.sqlite`, taken on launch and when you return to the
+app, before any migration) and keeps the last 14. "Show backups in Finder" in
+the toolbar menu opens the folder. To restore one, quit Swing and copy it over
+`moodbattery.sqlite`. Export leaves out period days and markers, so the
+backups are the only complete copies.
+
+A second copy goes off the Mac on every launch, into
+`iCloud Drive/Swing/database-backups` (`moodbattery-yyyy-MM-dd-HHmmss.sqlite`,
+newest 30 kept), if that folder exists. The path is fixed for now; a "pick your
+own backup folder" setting will replace it. "Show iCloud backups in Finder"
+opens it.
+
 Table `periodStart` holds one `localDate` (`yyyy-MM-dd`, primary key) per
-logged period start, for the PMDD lens.
+logged period start, for the PMDD lens. Table `marker` holds the diagram
+markers: `id`, `localDate`, `label`, and `kind` (`medication`,
+`appointment` or `other`).
 
 ## MCP server (optional)
 
@@ -186,7 +214,8 @@ Tools:
 | `mood_summary`        | `days?` (default 7)                                    | Average, range and count over a period   |
 | `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |
 | `range_summary`       | `start`, `end?` (default today)                        | Exact numbers for a period (see below)   |
-| `mood_episodes`       | none                                                   | Every sustained episode in the diary     |
+| `mood_episodes`       | none                                                   | Every episode, and a run forming now     |
+| `list_markers`        | none                                                   | The markers placed on the diagram        |
 
 The server follows the app's rules. A day holds one entry, so saving to a day
 that already has one is refused. Timestamps must be ISO 8601 (local time
@@ -198,7 +227,8 @@ date).
 `range_summary` gives the numbers a written summary should quote, worked out
 rather than estimated: days logged, mood average and range, days per band (in
 everyday words and on the Bipolar UK Mood Scale), tag counts, and the episodes
-that overlap the period. Episodes and bands use the same rules as the app
+that overlap the period, and the markers in it (`entries_in_range` lists them
+too). Episodes and bands use the same rules as the app
 (`MoodState`, `MoodScale`, `EpisodeDetector`), repeated in Python: change them
 in both places.
 
@@ -236,7 +266,7 @@ Sources/MoodBattery/
   Entry/                     Gauge editor, text fields
   Tank/                      Gauge view, spark effects, mood colors
   History/                   Entry list, detail panel
-  Weekly/                    Mood diagram (week/month/year)
+  Weekly/                    Mood diagram (week/month/year), markers
   Persistence/               SQLite store, database manager
   Import/                    Markdown diary importer
   Export/                    CSV and JSON export

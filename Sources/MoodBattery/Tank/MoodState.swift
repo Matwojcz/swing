@@ -12,6 +12,22 @@ enum MoodState {
         }
     }
 
+    /// The caption for a run that is forming (`EpisodeDetector.forming`), in the lens's words. It names the state and
+    /// counts days, with no target number, so it never reads as a countdown.
+    static func formingCaption(_ run: EpisodeDetector.Episode, lens: Lens, calendar: Calendar = .current) -> String {
+        let days = (calendar.dateComponents([.day], from: run.startDate, to: run.endDate).day ?? 0) + 1
+        switch (lens, run.type) {
+        case (.bipolar, .elevated):
+            return "Day \(days) in the \(run.averageMood >= 8.5 ? "mania" : "hypomania") range"
+        case (.bipolar, .depressive):
+            return "Day \(days) in the depression range"
+        case (_, .elevated):
+            return "Day \(days) of an elevated run"
+        case (_, .depressive):
+            return "Day \(days) of a low run"
+        }
+    }
+
     /// The names search finds the day by in the given lens: its band, without flavour or cycle-day text ("very low",
     /// "hypomania"). A Bipolar balanced day at an edge also has "balanced lifted" or "balanced dipping", and the PMDD lens
     /// adds the cycle phase ("premenstrual") when a cycle is logged. Built from the same bands as `label`.

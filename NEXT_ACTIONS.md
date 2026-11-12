@@ -2,8 +2,6 @@
 
 ## For Mat
 
-- **24 May 2026 has two entries** (#603: mood 2.0, no note; #609: mood 3.0 with a note). The diagram draws their
-  average. Delete one in the app.
 - **Restart the diary chat's Swing connection** to pick up the new MCP server (one entry per day, checked
   timestamps, tags, period tools).
 
@@ -20,18 +18,17 @@
 
 ## Decided, ready to start
 
-- **Pattern forming.** Agreed design in `docs/PATTERN_FORMING.md`: a dashed band and a "Day 3 of an elevated
-  run" caption for a run that hasn't reached full length yet; also reported by the MCP server. Small:
-  `EpisodeDetector` returns the open run, the diagram gets one more band style. Keep the Python copy in step.
-- **Markers on the diagram.** Hand-placed markers (date, label, kind: medication, appointment, other) drawn as a
-  dashed vertical line with a label at every scale. Clicking one shows the 30 days before and after (average,
-  days logged, days per band), worked out by the app and worded as what changed, not why. Added by right-click
-  on a day or from the entry panel. One new table; include markers in the MCP range tools; sync to the phone.
-- **Automatic backups before sync.** A dated copy of the database on launch (keep the last few). Export leaves
-  out period days and can't be imported back, and the sync work will restructure the database.
 - **iPhone port.** Plan in `docs/IOS_PORT_PLAN.md` (iPhone 15 Pro, sync through an iCloud Drive folder). Next is
   phase 0: spikes for free signing, SideStore refresh and the shared folder, plus a quick test of Apple's built-in
   model against diary text, and whether a free-signed app may read sleep from Apple Health.
+
+- **Pick your own backup folder (setting in the app).** The second backup copy goes to a fixed path for now,
+  `iCloud Drive/Swing/database-backups`, which only exists on a Mac with iCloud Drive. Before the cross-platform
+  work (iPhone, Android, other people using Swing), replace it with a "Choose backup folder…" setting that
+  remembers the folder (a security-scoped bookmark, so it also works sandboxed), shows where copies go and when
+  the last one was made, and can be turned off. It should share the folder choice with sync, which needs the
+  same kind of user-picked folder (`docs/IOS_PORT_PLAN.md`). Until then the path is in
+  `DatabaseManager.iCloudBackupDirectory`.
 
 ## Ideas, not decided
 

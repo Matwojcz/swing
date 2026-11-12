@@ -26,6 +26,9 @@ struct ContentView: View {
     let tagging: TaggingController
     @State private var showAutoTagAllConfirmation = false
     @State private var cycle = CycleCalendar.empty
+    @State private var markers: [DiagramMarker] = []
+    /// The marker being added (no id yet) or changed in the marker sheet.
+    @State private var editingMarker: DiagramMarker?
     /// Search matches mood band names in the words of this lens.
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
     @State private var mainAreaSize: CGSize = .zero
@@ -45,6 +48,7 @@ struct ContentView: View {
 
     private let store = MoodEntryStore()
     private let periodStore = PeriodStore()
+    private let markerStore = MarkerStore()
     private let importer = MarkdownImporter()
 
     private var searchTerms: [EntrySearch.Term] { EntrySearch.terms(in: searchText, lens: lens) }
@@ -92,7 +96,14 @@ struct ContentView: View {
                             }
                         }
                     }, scrollToDate: diagramScrollDate, highlightedEntry: selectedEntry,
-                    searchMatches: isSearching ? searchMatches : nil)
+                    searchMatches: isSearching ? searchMatches : nil,
+                    markers: markers,
+                    onAddMarker: { addMarker(on: $0) },
+                    onEditMarker: { editingMarker = $0 },
+                    onDeleteMarker: { marker in
+                        persist { try markerStore.delete(marker) }
+                        reloadMarkers()
+                    })
                     .padding(.horizontal, 16)
                 }
                 .frame(maxWidth: Self.maxMainColumnWidth)
@@ -130,6 +141,7 @@ struct ContentView: View {
                         tagging.autoTag(entry, onTagged: applyTagged)
                     }, isAutoTagging: tagging.activity == .single(entryID: entry.id ?? -1),
                     autoTagDisabled: tagging.isBusy, onPeriodStartChange: setPeriodStart,
+                    onAddMarker: { addMarker(on: entry.day()) },
                     isEditing: $isEditingInPanel)
                     .transition(.opacity)
                 }
@@ -223,6 +235,8 @@ struct ContentView: View {
         // Entries can be written from outside while the app is open (the MCP server), so read them again on return.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             reload()
+            // The app can stay open for days: take the day's backup when it's next used.
+            DatabaseManager.shared.backUpIfDue()
         }
         .searchable(text: $searchText, prompt: "Tags and moods, or \"words\" in notes")
         .onChange(of: searchText) { runSearch() }
@@ -253,6 +267,8 @@ struct ContentView: View {
                 Menu {
                     Button("Export as CSV") { exportCSV() }
                     Button("Export as JSON") { exportJSON() }
+                    Button("Show backups in Finder") { showBackups(in: DatabaseManager.shared.backupDirectory) }
+                    Button("Show iCloud backups in Finder") { showBackups(in: DatabaseManager.shared.iCloudBackupDirectory) }
                     Divider()
                     #if DEBUG
                     Button("Seed 6 months of dummy data") { seedDummyData() }
@@ -302,6 +318,13 @@ struct ContentView: View {
             Button("OK") { tagging.errorMessage = nil }
         } message: {
             Text(tagging.errorMessage ?? "")
+        }
+        .sheet(item: $editingMarker) { marker in
+            MarkerEditor(marker: marker, onSave: { saved in
+                persist { try markerStore.save(saved) }
+                editingMarker = nil
+                reloadMarkers()
+            }, onCancel: { editingMarker = nil })
         }
         .sheet(isPresented: $showImportPreview) {
             ImportPreviewSheet(
@@ -373,7 +396,17 @@ struct ContentView: View {
             selectedEntry = entries.first { $0.id == selected.id }
             if selectedEntry == nil { isDetailPanelShown = false }
         }
+        reloadMarkers()
         reloadCycle()
+    }
+
+    private func reloadMarkers() {
+        if let loaded = try? markerStore.fetchAll() { markers = loaded }
+    }
+
+    /// Opens the marker sheet for a new marker on `day`.
+    private func addMarker(on day: Date) {
+        editingMarker = DiagramMarker(id: nil, localDate: MoodEntry.localDateString(for: day), label: "", kind: .medication)
     }
 
     /// Reloads the period start days, then the search, whose PMDD band names depend on them.
@@ -540,6 +573,15 @@ struct ContentView: View {
         tagging.cancelBatch()
         persist { try store.deleteAll() }
         reload()
+    }
+
+    /// Opens a folder of database backups, or says why it can't.
+    private func showBackups(in directory: URL?) {
+        guard let directory, FileManager.default.fileExists(atPath: directory.path) else {
+            saveError = "The backup folder \(directory?.path ?? "") doesn't exist."
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([directory])
     }
 
     /// Serialises all entries as CSV and presents a save dialog.

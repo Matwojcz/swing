@@ -25,10 +25,19 @@ struct MoodDiagramView: View {
     var highlightedEntry: MoodEntry?
     /// Entries matching the current search: nil when not searching. While searching, the line and dots are dimmed and every dot (or, on the year scale, week dot) holding a match gets a white ring.
     var searchMatches: [MoodEntry]?
+    /// Days marked by hand, drawn as dashed vertical lines with a label; clicking one shows the days around it.
+    var markers: [DiagramMarker] = []
+    /// Asks the parent to add a marker on a day (right-click a day on the week scale).
+    var onAddMarker: ((Date) -> Void)?
+    var onEditMarker: ((DiagramMarker) -> Void)?
+    var onDeleteMarker: ((DiagramMarker) -> Void)?
 
+    @AppStorage(Lens.storageKey) private var lens: Lens = .none
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
     @State private var magnifyAnchor: CGFloat = 1.0
+    /// The marker whose card is open.
+    @State private var openMarkerID: Int64?
 
     private let height: CGFloat = 150
     private let verticalPadding: CGFloat = 14
@@ -84,13 +93,14 @@ struct MoodDiagramView: View {
     var body: some View {
         // Detected once per render and clipped per page.
         let episodes = EpisodeDetector.detect(entries: entries, calendar: calendar)
+        let forming = EpisodeDetector.forming(entries: entries, calendar: calendar)
         VStack(spacing: 4) {
             monthHeader(for: visiblePage)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 0) {
                     ForEach(0..<pageCount, id: \.self) { page in
-                        diagramPage(page: page, episodes: episodes)
+                        diagramPage(page: page, episodes: episodes, forming: forming)
                             .containerRelativeFrame(.horizontal)
                     }
                 }
@@ -100,6 +110,10 @@ struct MoodDiagramView: View {
             .scrollPosition(id: $currentPage, anchor: .center)
             .defaultScrollAnchor(.trailing)
             .frame(height: height + 30)
+
+            if let forming {
+                formingCaption(forming)
+            }
 
             scaleIndicator
                 .padding(.top, 8)
@@ -123,7 +137,7 @@ struct MoodDiagramView: View {
     // MARK: - Page content
 
     /// Builds the full content for one diagram page: Canvas with episodes, baseline, mood line, a highlight ring for the selected entry (drawn as an overlay so it can fade), plus tap targets and day labels.
-    private func diagramPage(page: Int, episodes: [EpisodeDetector.Episode]) -> some View {
+    private func diagramPage(page: Int, episodes: [EpisodeDetector.Episode], forming: EpisodeDetector.Episode?) -> some View {
         let days = daysForPage(page)
 
         let drawingPoints: [MoodDataAggregator.DataPoint]
@@ -140,6 +154,7 @@ struct MoodDiagramView: View {
         }
 
         let pageEpisodes = episodesForPage(days, from: episodes)
+        let pageForming = episodesForPage(days, from: forming.map { [$0] } ?? [])
 
         return VStack(spacing: 4) {
             ZStack {
@@ -150,6 +165,7 @@ struct MoodDiagramView: View {
                 } else {
                     Canvas { context, size in
                         drawEpisodes(pageEpisodes, in: context, size: size)
+                        drawForming(pageForming, in: context, size: size)
                         drawBaseline(in: context, size: size)
                         drawSeries(drawingPoints, in: context, size: size,
                                    dotRange: 0..<scale.dayCount)
@@ -184,6 +200,7 @@ struct MoodDiagramView: View {
                                 .contentShape(Rectangle())
                                 .position(x: px, y: py)
                                 .onTapGesture { onSelectDate?(dp.date) }
+                                .contextMenu { addMarkerMenu(for: dp.date) }
                         }
 
                         ForEach(0..<scale.dayCount, id: \.self) { dayIdx in
@@ -195,6 +212,7 @@ struct MoodDiagramView: View {
                                     .contentShape(Rectangle())
                                     .position(x: px, y: baselineY)
                                     .onTapGesture { onSelectDate?(days[dayIdx]) }
+                                    .contextMenu { addMarkerMenu(for: days[dayIdx]) }
                             }
                         }
                     }
@@ -221,6 +239,8 @@ struct MoodDiagramView: View {
                             }
                     }
                 }
+
+                markerLayer(days: days)
             }
             .frame(height: height)
 
@@ -274,6 +294,99 @@ struct MoodDiagramView: View {
         .frame(width: ringRadius * 2, height: ringRadius * 2)
         .position(x: x(forDayIndex: point.dayIndex, totalDays: scale.dayCount, width: size.width),
                   y: y(for: point.mood, height: size.height))
+    }
+
+    // MARK: - Markers
+
+    /// The right-click menu on a day of the week scale.
+    @ViewBuilder
+    private func addMarkerMenu(for day: Date) -> some View {
+        if let onAddMarker {
+            Button("Add marker…") { onAddMarker(day) }
+        }
+    }
+
+    /// Dashed lines for the markers on this page, each with a small flag at the top that opens its card. Flags in
+    /// the last third of the page sit left of their line so they stay on the page; several on one day stack.
+    private func markerLayer(days: [Date]) -> some View {
+        var perDay: [Int: Int] = [:]
+        let placed: [(marker: DiagramMarker, index: Int, stack: Int)] = markers.compactMap { marker in
+            guard let day = marker.day(in: calendar), let index = days.firstIndex(of: day) else { return nil }
+            let stack = perDay[index, default: 0]
+            perDay[index] = stack + 1
+            return (marker, index, stack)
+        }
+        return GeometryReader { geo in
+            ForEach(placed, id: \.marker.id) { item in
+                let px = x(forDayIndex: item.index, totalDays: scale.dayCount, width: geo.size.width)
+                Path { path in
+                    path.move(to: CGPoint(x: px, y: 0))
+                    path.addLine(to: CGPoint(x: px, y: geo.size.height))
+                }
+                .stroke(Color.white.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                .allowsHitTesting(false)
+
+                let leftOfLine = item.index > scale.dayCount * 2 / 3
+                HStack(spacing: 0) {
+                    if leftOfLine {
+                        Spacer(minLength: 0)
+                        markerFlag(item.marker)
+                        Spacer().frame(width: max(0, geo.size.width - px))
+                    } else {
+                        Spacer().frame(width: px)
+                        markerFlag(item.marker)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .frame(width: geo.size.width, alignment: .leading)
+                .offset(y: CGFloat(item.stack) * 20)
+            }
+        }
+    }
+
+    /// A marker's flag: its kind's symbol and, except on the year scale, its label.
+    private func markerFlag(_ marker: DiagramMarker) -> some View {
+        Button {
+            openMarkerID = marker.id
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: marker.kind.symbol)
+                    .font(.system(size: 9))
+                if scale != .year {
+                    Text(marker.label)
+                        .font(.system(size: 10, weight: .medium))
+                        .lineLimit(1)
+                        .frame(maxWidth: 130, alignment: .leading)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+            .foregroundStyle(.primary.opacity(0.85))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.tankSurface))
+            .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+        .help(marker.label)
+        .accessibilityLabel("\(marker.kind.name) marker: \(marker.label)")
+        .popover(isPresented: Binding(
+            get: { openMarkerID != nil && openMarkerID == marker.id },
+            set: { if !$0, openMarkerID == marker.id { openMarkerID = nil } }
+        ), arrowEdge: .bottom) {
+            MarkerCard(
+                marker: marker,
+                comparison: MarkerComparison.compare(entries: entries, around: marker.day(in: calendar) ?? Date(),
+                                                     calendar: calendar),
+                onEdit: {
+                    openMarkerID = nil
+                    onEditMarker?(marker)
+                },
+                onDelete: {
+                    openMarkerID = nil
+                    onDeleteMarker?(marker)
+                }
+            )
+        }
     }
 
     /// Zooms in one level (year→month, month→week) and navigates to the page containing the tapped date.
@@ -397,6 +510,7 @@ struct MoodDiagramView: View {
                         .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
                         .onTapGesture { onSelectDate?(day) }
+                        .contextMenu { addMarkerMenu(for: day) }
                 }
             case .month:
                 ForEach([0, 7, 14, 21, 29], id: \.self) { idx in
@@ -599,6 +713,36 @@ struct MoodDiagramView: View {
                 }
             }
         }
+    }
+
+    private static let formingDash = StrokeStyle(lineWidth: 1, dash: [4, 3])
+
+    /// Outlines a run that is forming with a dashed band in its colour, unfilled: it fills in as an episode once it is
+    /// long enough. An edge that runs past the page is drawn off the canvas so it stays open.
+    private func drawForming(_ pageEpisodes: [PageEpisode], in context: GraphicsContext, size: CGSize) {
+        let totalDays = scale.dayCount
+        for item in pageEpisodes {
+            let left = item.extendsLeft ? -4 : x(forDayIndex: item.startIndex, totalDays: totalDays, width: size.width) - 4
+            let right = item.extendsRight ? size.width + 4 : x(forDayIndex: item.endIndex, totalDays: totalDays, width: size.width) + 4
+            let rect = CGRect(x: left, y: 1, width: right - left, height: size.height - 2)
+            let color = MoodColor.color(mood: item.episode.averageMood, flavour: item.episode.averageFlavour)
+            context.stroke(Path(roundedRect: rect, cornerRadius: 4), with: .color(color.opacity(0.8)), style: Self.formingDash)
+        }
+    }
+
+    /// The line under the diagram while a run is forming, with a small dashed swatch matching the band.
+    private func formingCaption(_ run: EpisodeDetector.Episode) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 2)
+                .stroke(MoodColor.color(mood: run.averageMood, flavour: run.averageFlavour), style: Self.formingDash)
+                .frame(width: 14, height: 10)
+            Text(MoodState.formingCaption(run, lens: lens, calendar: calendar))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 4)
+        .help("A run that would count as an episode if it carries on. It only counts days.")
+        .accessibilityElement(children: .combine)
     }
 
     /// Draws the mood line (gradient segments between points) and dots, optionally restricting dots to a day index range to hide boundary points.

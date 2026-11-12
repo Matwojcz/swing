@@ -61,7 +61,8 @@ around it.
 - **Hover a dot** — rest the pointer on a dot (it doesn't react while
   scrolling or passing over) and a small card shows that day's mood, band and tags, and a
   line when the day stands out: "Lowest since 26 Oct" or "Highest since 14
-  Jul" (only when it's the lowest or highest for at least two weeks). On the
+  Jul" (only when nothing lower or higher was logged for at least two weeks),
+  or "As low as 24 Aug" when an earlier day in that stretch matched it. On the
   year scale the dot is a week: its average and its lowest and highest day.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, note, or the tags). Shows the

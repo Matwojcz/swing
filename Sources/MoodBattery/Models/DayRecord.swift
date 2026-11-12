@@ -9,35 +9,39 @@ enum DayRecord {
 
     struct Result: Equatable {
         let kind: Kind
-        /// The last earlier day that was at least as low (or as high); nil when no earlier day was, so the day is the
-        /// lowest (or highest) since logging began.
+        /// The last earlier day that was lower (or higher); nil when none was, so nothing lower (or higher) has been
+        /// logged at all.
         let since: Date?
+        /// The latest day since then that was exactly as low (or high), if any: the card then reads "As low as <day>".
+        let tiedWith: Date?
     }
 
-    /// A day counts as standing out only when it's the lowest or highest for at least this many days.
+    /// A day counts as standing out only when nothing lower (or higher) was logged for at least this many days.
     static let minimumDays = 14
 
-    /// The lowest-or-highest-since record for `day`, nil for an ordinary day or a day without an entry. Days with
-    /// several entries use their average, as the diagram does. When a day is both (a flat stretch), the longer wins.
+    /// The record for `day`, nil for an ordinary day or a day without an entry. Days with several entries use their
+    /// average, as the diagram does, compared at one decimal so equal-looking days tie. When a day is both (a flat
+    /// stretch), the longer run wins.
     static func find(for day: Date, entries: [MoodEntry], calendar: Calendar = .current) -> Result? {
         let target = calendar.startOfDay(for: day)
-        let moods = Dictionary(grouping: entries) { $0.day(in: calendar) }
-            .mapValues { group in group.reduce(0) { $0 + $1.mood } / Double(group.count) }
-        guard let mood = moods[target], let first = moods.keys.min() else { return nil }
-        let earlier = moods.filter { $0.key < target }.sorted { $0.key > $1.key }
+        let tenths = Dictionary(grouping: entries) { $0.day(in: calendar) }
+            .mapValues { group in Int((group.reduce(0) { $0 + $1.mood } / Double(group.count) * 10).rounded()) }
+        guard let mood = tenths[target], let first = tenths.keys.min() else { return nil }
+        let earlier = tenths.filter { $0.key < target }.sorted { $0.key > $1.key }
 
-        func record(_ kind: Kind, beats: (Double) -> Bool) -> (result: Result, days: Int)? {
-            // The nearest earlier day that this one doesn't beat ends the run.
-            if let blocker = earlier.first(where: { !beats($0.value) }) {
-                let days = calendar.dateComponents([.day], from: blocker.key, to: target).day ?? 0
-                return days >= minimumDays ? (Result(kind: kind, since: blocker.key), days) : nil
-            }
-            let days = calendar.dateComponents([.day], from: first, to: target).day ?? 0
-            return days >= minimumDays ? (Result(kind: kind, since: nil), days) : nil
+        func record(_ kind: Kind, beyond: (Int) -> Bool) -> (result: Result, days: Int)? {
+            // The nearest earlier day further out than this one ends the run; equal days on the way are ties.
+            let blocker = earlier.first { beyond($0.value) }
+            let start = blocker?.key ?? first
+            let days = calendar.dateComponents([.day], from: start, to: target).day ?? 0
+            guard days >= minimumDays else { return nil }
+            let tie = earlier.first { $0.key > start && $0.value == mood }?.key
+                ?? (blocker == nil && tenths[first] == mood && first < target ? first : nil)
+            return (Result(kind: kind, since: blocker?.key, tiedWith: tie), days)
         }
 
-        let lowest = record(.lowest) { mood < $0 }
-        let highest = record(.highest) { mood > $0 }
+        let lowest = record(.lowest) { $0 < mood }
+        let highest = record(.highest) { $0 > mood }
         switch (lowest, highest) {
         case let (low?, high?): return low.days >= high.days ? low.result : high.result
         case let (low?, nil): return low.result

@@ -26,6 +26,7 @@ struct MoodDiagramView: View {
     /// Entries matching the current search: nil when not searching. While searching, the line and dots are dimmed and every dot (or, on the year scale, week dot) holding a match gets a white ring.
     var searchMatches: [MoodEntry]?
 
+    @AppStorage(Lens.storageKey) private var lens: Lens = .none
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
     @State private var magnifyAnchor: CGFloat = 1.0
@@ -84,13 +85,14 @@ struct MoodDiagramView: View {
     var body: some View {
         // Detected once per render and clipped per page.
         let episodes = EpisodeDetector.detect(entries: entries, calendar: calendar)
+        let forming = EpisodeDetector.forming(entries: entries, calendar: calendar)
         VStack(spacing: 4) {
             monthHeader(for: visiblePage)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 0) {
                     ForEach(0..<pageCount, id: \.self) { page in
-                        diagramPage(page: page, episodes: episodes)
+                        diagramPage(page: page, episodes: episodes, forming: forming)
                             .containerRelativeFrame(.horizontal)
                     }
                 }
@@ -100,6 +102,10 @@ struct MoodDiagramView: View {
             .scrollPosition(id: $currentPage, anchor: .center)
             .defaultScrollAnchor(.trailing)
             .frame(height: height + 30)
+
+            if let forming {
+                formingCaption(forming)
+            }
 
             scaleIndicator
                 .padding(.top, 8)
@@ -123,7 +129,7 @@ struct MoodDiagramView: View {
     // MARK: - Page content
 
     /// Builds the full content for one diagram page: Canvas with episodes, baseline, mood line, a highlight ring for the selected entry (drawn as an overlay so it can fade), plus tap targets and day labels.
-    private func diagramPage(page: Int, episodes: [EpisodeDetector.Episode]) -> some View {
+    private func diagramPage(page: Int, episodes: [EpisodeDetector.Episode], forming: EpisodeDetector.Episode?) -> some View {
         let days = daysForPage(page)
 
         let drawingPoints: [MoodDataAggregator.DataPoint]
@@ -140,6 +146,7 @@ struct MoodDiagramView: View {
         }
 
         let pageEpisodes = episodesForPage(days, from: episodes)
+        let pageForming = episodesForPage(days, from: forming.map { [$0] } ?? [])
 
         return VStack(spacing: 4) {
             ZStack {
@@ -150,6 +157,7 @@ struct MoodDiagramView: View {
                 } else {
                     Canvas { context, size in
                         drawEpisodes(pageEpisodes, in: context, size: size)
+                        drawForming(pageForming, in: context, size: size)
                         drawBaseline(in: context, size: size)
                         drawSeries(drawingPoints, in: context, size: size,
                                    dotRange: 0..<scale.dayCount)
@@ -599,6 +607,36 @@ struct MoodDiagramView: View {
                 }
             }
         }
+    }
+
+    private static let formingDash = StrokeStyle(lineWidth: 1, dash: [4, 3])
+
+    /// Outlines a run that is forming with a dashed band in its colour, unfilled: it fills in as an episode once it is
+    /// long enough. An edge that runs past the page is drawn off the canvas so it stays open.
+    private func drawForming(_ pageEpisodes: [PageEpisode], in context: GraphicsContext, size: CGSize) {
+        let totalDays = scale.dayCount
+        for item in pageEpisodes {
+            let left = item.extendsLeft ? -4 : x(forDayIndex: item.startIndex, totalDays: totalDays, width: size.width) - 4
+            let right = item.extendsRight ? size.width + 4 : x(forDayIndex: item.endIndex, totalDays: totalDays, width: size.width) + 4
+            let rect = CGRect(x: left, y: 1, width: right - left, height: size.height - 2)
+            let color = MoodColor.color(mood: item.episode.averageMood, flavour: item.episode.averageFlavour)
+            context.stroke(Path(roundedRect: rect, cornerRadius: 4), with: .color(color.opacity(0.8)), style: Self.formingDash)
+        }
+    }
+
+    /// The line under the diagram while a run is forming, with a small dashed swatch matching the band.
+    private func formingCaption(_ run: EpisodeDetector.Episode) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 2)
+                .stroke(MoodColor.color(mood: run.averageMood, flavour: run.averageFlavour), style: Self.formingDash)
+                .frame(width: 14, height: 10)
+            Text(MoodState.formingCaption(run, lens: lens, calendar: calendar))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 4)
+        .help("A run that would count as an episode if it carries on. It only counts days.")
+        .accessibilityElement(children: .combine)
     }
 
     /// Draws the mood line (gradient segments between points) and dots, optionally restricting dots to a day index range to hide boundary points.

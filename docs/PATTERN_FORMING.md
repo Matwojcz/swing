@@ -1,6 +1,6 @@
 # Proposal: pattern forming
 
-Status: **Agreed, not built** · Nov 2026
+Status: **Built** · Nov 2026
 
 ## The gap it fills
 

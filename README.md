@@ -46,6 +46,12 @@ your mood over time across week, month, and year scales.
   following DSM-5 bipolar II durations. Runs tolerate a couple of unlogged or
   near-baseline days, but a logged day on the opposite side ends them, and at
   least 70% of the span must be qualifying days.
+  A run that is still open today but not long enough yet shows as a dashed,
+  unfilled band, from 2 days for an elevated run or 7 for a low one, with a
+  caption under the diagram such as "Day 3 of an elevated run" (in the
+  Bipolar lens, "Day 3 in the hypomania range"). It fills in on the day it
+  becomes an episode, or disappears without a trace if the run fades. It
+  only counts days: no alerts, advice or predictions.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, note, or the tags). Shows the
   entry's tags, an Auto-tag button, and (in the PMDD lens) a "Period started
@@ -186,7 +192,7 @@ Tools:
 | `mood_summary`        | `days?` (default 7)                                    | Average, range and count over a period   |
 | `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |
 | `range_summary`       | `start`, `end?` (default today)                        | Exact numbers for a period (see below)   |
-| `mood_episodes`       | none                                                   | Every sustained episode in the diary     |
+| `mood_episodes`       | none                                                   | Every episode, and a run forming now     |
 
 The server follows the app's rules. A day holds one entry, so saving to a day
 that already has one is refused. Timestamps must be ISO 8601 (local time

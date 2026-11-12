@@ -23,6 +23,9 @@ enum MoodScale {
     /// Most consecutive non-qualifying days (tolerated or unlogged) a run may bridge.
     static let episodeDepressiveMaxGapDays = 2
     static let episodeElevatedMaxGapDays = 2
+    /// A run still open today is shown as forming from this many days, before it is long enough to be an episode.
+    static let episodeDepressiveFormingDays = 7
+    static let episodeElevatedFormingDays = 2
 
     /// Formats a mood value for display, dropping the decimal when it's a whole number.
     static func format(_ mood: Double) -> String {

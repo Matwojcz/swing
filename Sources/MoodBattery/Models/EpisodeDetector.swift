@@ -44,24 +44,13 @@ enum EpisodeDetector {
 
     /// Runs global episode detection across all entries and returns the depressive and elevated episodes, ordered by start date.
     static func detect(entries: [MoodEntry], calendar: Calendar = .current) -> [Episode] {
-        let grouped = Dictionary(grouping: entries) { $0.day(in: calendar) }
         let sortedDates = entries.map { $0.day(in: calendar) }
         guard let earliest = sortedDates.min(), let latest = sortedDates.max() else { return [] }
 
         let totalDays = (calendar.dateComponents([.day], from: earliest, to: latest).day ?? 0) + 1
         guard totalDays >= MoodScale.episodeElevatedMinDays else { return [] }
 
-        let allDays = (0..<totalDays).map { calendar.date(byAdding: .day, value: $0, to: earliest)! }
-
-        let dayMoods: [DayMood?] = allDays.map { day in
-            let key = calendar.startOfDay(for: day)
-            guard let dayEntries = grouped[key], !dayEntries.isEmpty else { return nil }
-            let count = Double(dayEntries.count)
-            return DayMood(
-                mood: dayEntries.reduce(0) { $0 + $1.mood } / count,
-                flavour: dayEntries.reduce(0) { $0 + $1.flavour } / count
-            )
-        }
+        let (allDays, dayMoods) = dailyMoods(entries: entries, from: earliest, through: latest, calendar: calendar)
 
         let depressive = scan(
             dayMoods: dayMoods, allDays: allDays, below: true,
@@ -78,6 +67,95 @@ enum EpisodeDetector {
             maxGap: MoodScale.episodeElevatedMaxGapDays
         )
         return (depressive + elevated).sorted { $0.startDate < $1.startDate }
+    }
+
+    /// The run still open on `today` that is on its way to an episode but not long enough yet: at least
+    /// `episodeElevatedFormingDays` (or `episodeDepressiveFormingDays`) under the same rules, counting the days since the
+    /// last logged one as gaps. Nil when nothing is forming, including when the open run is already a full episode,
+    /// which `detect` returns. Only one run can be open at a time: a day past one threshold breaks the other kind.
+    static func forming(entries: [MoodEntry], today: Date = Date(), calendar: Calendar = .current) -> Episode? {
+        guard let earliest = entries.map({ $0.day(in: calendar) }).min() else { return nil }
+        let end = calendar.startOfDay(for: today)
+        guard earliest <= end else { return nil }
+        let (allDays, dayMoods) = dailyMoods(entries: entries, from: earliest, through: end, calendar: calendar)
+        return openRun(
+            dayMoods: dayMoods, allDays: allDays, below: false,
+            threshold: MoodScale.episodeElevatedThreshold,
+            toleratedLimit: MoodScale.episodeElevatedToleratedMin,
+            minDays: MoodScale.episodeElevatedMinDays,
+            formingDays: MoodScale.episodeElevatedFormingDays,
+            maxGap: MoodScale.episodeElevatedMaxGapDays
+        ) ?? openRun(
+            dayMoods: dayMoods, allDays: allDays, below: true,
+            threshold: MoodScale.episodeDepressiveThreshold,
+            toleratedLimit: MoodScale.episodeDepressiveToleratedMax,
+            minDays: MoodScale.episodeDepressiveMinDays,
+            formingDays: MoodScale.episodeDepressiveFormingDays,
+            maxGap: MoodScale.episodeDepressiveMaxGapDays
+        )
+    }
+
+    /// Every day from `first` through `last` with its average mood and flavour, nil where nothing was logged.
+    private static func dailyMoods(entries: [MoodEntry], from first: Date, through last: Date,
+                                   calendar: Calendar) -> (days: [Date], moods: [DayMood?]) {
+        let grouped = Dictionary(grouping: entries) { $0.day(in: calendar) }
+        let count = (calendar.dateComponents([.day], from: first, to: last).day ?? 0) + 1
+        let days = (0..<count).map { calendar.date(byAdding: .day, value: $0, to: first)! }
+        let moods: [DayMood?] = days.map { day in
+            guard let dayEntries = grouped[calendar.startOfDay(for: day)], !dayEntries.isEmpty else { return nil }
+            let count = Double(dayEntries.count)
+            return DayMood(
+                mood: dayEntries.reduce(0) { $0 + $1.mood } / count,
+                flavour: dayEntries.reduce(0) { $0 + $1.flavour } / count
+            )
+        }
+        return (days, moods)
+    }
+
+    /// Scans like `scan`, but only for a run that reaches the last day without breaking. Returns it when it is at least
+    /// `formingDays` long, meets the qualifying share and is still shorter than `minDays`.
+    private static func openRun(dayMoods: [DayMood?], allDays: [Date], below: Bool, threshold: Double,
+                                toleratedLimit: Double, minDays: Int, formingDays: Int, maxGap: Int) -> Episode? {
+        let kinds = dayMoods.map { kind(of: $0, below: below, threshold: threshold, toleratedLimit: toleratedLimit) }
+        var start = 0
+        while start < kinds.count {
+            guard kinds[start] == .qualifying else { start += 1; continue }
+
+            var lastQualifying = start
+            var qualifying = 1
+            var gapRun = 0
+            var ended = false
+            var j = start + 1
+            while j < kinds.count {
+                if kinds[j] == .qualifying {
+                    lastQualifying = j
+                    qualifying += 1
+                    gapRun = 0
+                } else if kinds[j] == .gap {
+                    gapRun += 1
+                    if gapRun > maxGap { ended = true; break }
+                } else {
+                    ended = true
+                    break
+                }
+                j += 1
+            }
+
+            let span = lastQualifying - start + 1
+            let shareMet = Double(qualifying) >= MoodScale.episodeMinQualifyingShare * Double(span)
+            if !ended {
+                if span >= minDays && shareMet { return nil }
+                if span >= formingDays && shareMet {
+                    return makeEpisode(dayMoods: dayMoods, allDays: allDays, start: start, end: lastQualifying,
+                                       threshold: threshold, below: below)
+                }
+                // A later start inside the same open run may still meet the share.
+                start += 1
+            } else {
+                start = span >= minDays && shareMet ? lastQualifying + 1 : start + 1
+            }
+        }
+        return nil
     }
 
     /// Classifies one day for a scan: qualifying past `threshold`, breaking beyond `toleratedLimit` on the opposite side, otherwise a gap.

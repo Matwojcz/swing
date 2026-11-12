@@ -1,25 +1,41 @@
 import SwiftUI
 
-/// The small card shown when hovering a dot on the diagram: the day's mood and the 30 days before and after it.
-/// Worded as what the numbers were, never why.
+/// The small card shown when hovering a dot on the diagram: the day's mood and tags, and a line when the day stands
+/// out ("Lowest since 26 Oct"). On the year scale a dot is a week: its average and its lowest and highest day.
 struct DayHoverCard: View {
     let date: Date
     /// On the year scale a dot is a week's average.
     let isWeek: Bool
     let mood: Double
+    /// The week's lowest and highest day, on the year scale.
+    var low: Double? = nil
+    var high: Double? = nil
     let label: String
-    let comparison: DayComparison
+    var tags: [MoodTag] = []
+    var record: DayRecord.Result? = nil
 
-    private static let dateFormatter: DateFormatter = {
+    private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEE d MMM"
+        return f
+    }()
+
+    private static let sinceFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM"
+        return f
+    }()
+
+    private static let sinceFormatterWithYear: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM yyyy"
         return f
     }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(isWeek ? "Week of \(Self.dateFormatter.string(from: date))" : Self.dateFormatter.string(from: date))
+                Text(isWeek ? "Week of \(Self.dayFormatter.string(from: date))" : Self.dayFormatter.string(from: date))
                     .font(.system(size: 11, weight: .semibold))
                 Spacer(minLength: 4)
                 Text(MoodScale.format((mood * 10).rounded() / 10))
@@ -30,9 +46,19 @@ struct DayHoverCard: View {
                     .foregroundStyle(MoodColor.color(mood: mood, flavour: 0.3))
                     .lineLimit(1)
             }
-            row(title: Self.days(comparison.before.days, "before"), window: comparison.before)
-            if comparison.after.days > 0 {
-                row(title: Self.days(comparison.after.days, "after"), window: comparison.after)
+            if isWeek, let low, let high {
+                Text("Days from \(MoodScale.format(low)) to \(MoodScale.format(high))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            if !tags.isEmpty {
+                MoodTagChips(tags: tags, fontSize: 10)
+            }
+            if let record {
+                Text(recordText(record))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 10)
@@ -42,34 +68,18 @@ struct DayHoverCard: View {
         .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
     }
 
-    /// "30 days before", "1 day after".
-    private static func days(_ count: Int, _ side: String) -> String {
-        "\(count) \(count == 1 ? "day" : "days") \(side)"
-    }
-
-        private func row(title: String, window: DayComparison.Window) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 4)
-            Text(window.averageMood.map { String(format: "%.1f", $0) } ?? "–")
-                .fontWeight(.medium)
-            Text(window.loggedDays == 0 ? "nothing logged" : "\(window.loggedDays) logged")
-                .foregroundStyle(.secondary)
-                .frame(width: 70, alignment: .trailing)
-        }
-        .font(.system(size: 11))
-        .monospacedDigit()
+    /// "Lowest since 26 Oct", "Highest since you started logging".
+    private func recordText(_ record: DayRecord.Result) -> String {
+        let word = record.kind == .lowest ? "Lowest" : "Highest"
+        guard let since = record.since else { return "\(word) since you started logging" }
+        let sameYear = Calendar.current.isDate(since, equalTo: date, toGranularity: .year)
+        return "\(word) since \((sameYear ? Self.sinceFormatter : Self.sinceFormatterWithYear).string(from: since))"
     }
 }
 
 #Preview {
-    DayHoverCard(
-        date: Date(), isWeek: false, mood: 6.2, label: "lifted",
-        comparison: DayComparison(
-            before: .init(days: 30, loggedDays: 29, averageMood: 5.0, elevatedDays: 2, lowDays: 1),
-            after: .init(days: 12, loggedDays: 11, averageMood: 4.6, elevatedDays: 0, lowDays: 1)
-        )
-    )
-    .padding()
+    DayHoverCard(date: Date(), isWeek: false, mood: 3.6, label: "dipping", tags: [.low, .foggy, .flat],
+                 record: .init(kind: .lowest, since: Calendar.current.date(byAdding: .day, value: -20, to: Date())))
+        .frame(width: 230)
+        .padding()
 }

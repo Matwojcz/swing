@@ -21,6 +21,9 @@
 - **iPhone port.** Plan in `docs/IOS_PORT_PLAN.md` (iPhone 15 Pro, sync through an iCloud Drive folder). Next is
   phase 0: spikes for free signing, SideStore refresh and the shared folder, plus a quick test of Apple's built-in
   model against diary text, and whether a free-signed app may read sleep from Apple Health.
+- **Sleep on the hover card (with the iPhone work).** If phase 0 shows a free-signed app can read Apple Health,
+  add the night's sleep to the diagram's hover card ("5h 10m sleep the night before"): the one thing the diagram
+  can't show by itself.
 
 - **Pick your own backup folder (setting in the app).** The second backup copy goes to a fixed path for now,
   `iCloud Drive/Swing/database-backups`, which only exists on a Mac with iCloud Drive. Before the cross-platform

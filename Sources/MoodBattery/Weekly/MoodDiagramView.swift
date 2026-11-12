@@ -315,7 +315,16 @@ struct MoodDiagramView: View {
             .min { $0.distance < $1.distance }?.point
     }
 
-    /// The card for the hovered point: its day (or week, on the year scale) and the 30 days before and after it.
+    /// The tags of the day's entries, in order, without repeats.
+    private func tags(on day: Date) -> [MoodTag] {
+        var seen: [MoodTag] = []
+        for entry in entries where entry.day(in: calendar) == day {
+            for tag in entry.moodTags where !seen.contains(tag) { seen.append(tag) }
+        }
+        return seen
+    }
+
+    /// The card for the hovered point: its day (or week, on the year scale), its tags, and whether it stands out.
     /// Placed above the dot, or below when the dot is near the top, and kept inside the page.
     private func hoverLayer(points: [MoodDataAggregator.DataPoint]) -> some View {
         GeometryReader { geo in
@@ -324,13 +333,17 @@ struct MoodDiagramView: View {
                 let py = y(for: point.mood, height: geo.size.height)
                 let half = Self.hoverCardWidth / 2
                 let cardX = min(max(px, half), max(half, geo.size.width - half))
+                let isWeek = scale == .year
                 DayHoverCard(
                     date: point.date,
-                    isWeek: scale == .year,
+                    isWeek: isWeek,
                     mood: point.mood,
+                    low: point.low,
+                    high: point.high,
                     label: MoodState.label(mood: point.mood, flavour: point.flavour, lens: lens,
                                            cycle: cycle.position(of: point.date)),
-                    comparison: DayComparison.compare(entries: entries, around: point.date, calendar: calendar)
+                    tags: isWeek ? [] : tags(on: point.date),
+                    record: isWeek ? nil : DayRecord.find(for: point.date, entries: entries, calendar: calendar)
                 )
                 .frame(width: Self.hoverCardWidth)
                 .fixedSize(horizontal: false, vertical: true)

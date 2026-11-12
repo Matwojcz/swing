@@ -1,6 +1,6 @@
 # Swing
 
-**v1.3**
+**v1.4**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time. Labels use neutral everyday words
@@ -89,10 +89,13 @@ around it.
 - **Retrospective entries** — tap an empty date in the week diagram to log
   for a past day; the "Logging for…" line has a cancel button, and ESC
   cancels it too. One entry per day is enforced.
-- **Markdown import** — import `.md` diary files with a preview sheet.
-  Parses dates and mood/flavour from field lines (`Mood: 4.8. Flavour: 0.4`,
-  one per line or together) or estimates them from the text. Days that
-  already have an entry are skipped.
+- **Import** — the toolbar Import menu reads three kinds of file, each
+  shown in a review sheet before anything is saved. A Markdown diary (`.md`):
+  dates and mood/flavour come from field lines (`Mood: 4.8. Flavour: 0.4`, one
+  per line or together) or are estimated from the text. A Swing export (`.csv`
+  or `.json`): entries come back as exported, with their day and tags (and
+  whether the tags were picked by hand); rows with a missing or out-of-range
+  value are left out and counted. Days that already have an entry are skipped.
 - **Search** — the toolbar search field has two kinds of search, and every
   word must match. Plain words find tags ("lonely") and mood band names in the
   current lens ("lifted", "hypomania") and nothing else, so low means low days,
@@ -109,8 +112,9 @@ around it.
   row shows why it matched (an outlined tag, a highlighted title, or the
   matching line of the note or band name), and the detail panel highlights the
   same. Up/down arrows step through the matches, Return jumps to the newest one.
-- **Data export and backups** — export all entries (with their tags) as CSV or
-  JSON from the toolbar menu, which also opens the two backup folders (see
+- **Data export and backups** — export all entries (with their tags and where
+  the tags came from) as CSV or JSON from the toolbar menu; Import reads both
+  back. The same menu which also opens the two backup folders (see
   Database) and has "Clear all entries". Debug builds add a dummy-data
   seeder there.
 - **MCP server** — Python server for Claude integration (log, query,
@@ -274,7 +278,7 @@ Sources/MoodBattery/
   History/                   Entry list, detail panel
   Weekly/                    Mood diagram (week/month/year), hover card
   Persistence/               SQLite store, database manager
-  Import/                    Markdown diary importer
+  Import/                    Markdown diary and CSV/JSON export importers
   Export/                    CSV and JSON export
   Models/                    MoodEntry, mood scale, episode detection,
                              per-day/week aggregation, menstrual cycle calendar

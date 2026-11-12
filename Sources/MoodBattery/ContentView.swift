@@ -7,6 +7,10 @@ struct ContentView: View {
     @State private var isDetailPanelShown = false
     @State private var scrollToEntry: MoodEntry?
     @State private var showImporter = false
+    /// What the file picker is importing: picked from the Import menu.
+    @State private var importFormat: ImportFormat = .markdown
+    /// Rows in an imported CSV or JSON that couldn't be read, reported once the import is saved.
+    @State private var unreadableImportRows = 0
     @State private var pendingImportEntries: [EditableImportEntry] = []
     @State private var showImportPreview = false
     @State private var importError: String?
@@ -240,9 +244,17 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem {
-                Button(action: { showImporter = true }) {
-                    Label("Import diary", systemImage: "square.and.arrow.down")
+                Menu {
+                    ForEach(ImportFormat.allCases) { format in
+                        Button(format.menuTitle) {
+                            importFormat = format
+                            showImporter = true
+                        }
+                    }
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
                 }
+                .help("Import entries: a Markdown diary, or a CSV or JSON file exported from Swing")
             }
             ToolbarItem {
                 Button(action: { showAutoTagAllConfirmation = true }) {
@@ -269,8 +281,8 @@ struct ContentView: View {
         }
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.plainText],
-            allowsMultipleSelection: true
+            allowedContentTypes: importFormat.contentTypes,
+            allowsMultipleSelection: importFormat == .markdown
         ) { result in
             handleFileImport(result)
         }
@@ -455,22 +467,40 @@ struct ContentView: View {
         }
     }
 
-    /// Processes selected markdown files, parsing diary entries and opening the import preview sheet.
+    /// Reads the picked files in the chosen format and opens the review sheet.
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            var parsed: [MarkdownImporter.ParsedEntry] = []
+            var imported: [EditableImportEntry] = []
+            var unreadable = 0
             for url in urls {
                 guard url.startAccessingSecurityScopedResource() else { continue }
                 defer { url.stopAccessingSecurityScopedResource() }
-                if let content = try? String(contentsOf: url, encoding: .utf8) {
-                    parsed.append(contentsOf: importer.parse(content))
+                do {
+                    switch importFormat {
+                    case .markdown:
+                        let content = try String(contentsOf: url, encoding: .utf8)
+                        imported += importer.parse(content).map { EditableImportEntry(parsed: $0) }
+                    case .csv:
+                        let read = try ExportFileImporter.entries(fromCSV: String(contentsOf: url, encoding: .utf8))
+                        imported += read.entries.map { EditableImportEntry(entry: $0) }
+                        unreadable += read.skipped
+                    case .json:
+                        let read = try ExportFileImporter.entries(fromJSON: Data(contentsOf: url))
+                        imported += read.entries.map { EditableImportEntry(entry: $0) }
+                        unreadable += read.skipped
+                    }
+                } catch {
+                    importError = error.localizedDescription
+                    return
                 }
             }
-            if parsed.isEmpty {
-                importError = "No diary entries with dates found."
+            if imported.isEmpty {
+                importError = importFormat == .markdown ? "No diary entries with dates found."
+                    : "No entries could be read from this file."
             } else {
-                pendingImportEntries = parsed.map { EditableImportEntry(parsed: $0) }
+                pendingImportEntries = imported
+                unreadableImportRows = unreadable
                 showImportPreview = true
             }
         case .failure(let error):
@@ -590,16 +620,10 @@ struct ContentView: View {
     private func confirmImport() {
         var skipped = 0
         for entry in pendingImportEntries {
-            let mood = MoodEntry(
-                id: nil,
-                mood: entry.mood,
-                flavour: entry.flavour,
-                title: entry.title.isEmpty ? nil : entry.title,
-                note: entry.note.isEmpty ? nil : entry.note,
-                timestamp: entry.timestamp
-            )
+            let mood = entry.moodEntry
             let saved = persist {
-                if try store.hasEntry(on: mood.timestamp) {
+                // By the entry's own day, which an export records even if the time zone has changed since.
+                if try store.hasEntry(on: mood.day()) {
                     skipped += 1
                 } else {
                     try store.save(mood)
@@ -610,8 +634,38 @@ struct ContentView: View {
         showImportPreview = false
         pendingImportEntries = []
         reload()
+        var notes: [String] = []
         if skipped > 0 {
-            importNotice = "Skipped \(skipped) \(skipped == 1 ? "entry" : "entries") for days that already have one."
+            notes.append("Skipped \(skipped) \(skipped == 1 ? "entry" : "entries") for days that already have one.")
+        }
+        if unreadableImportRows > 0 {
+            notes.append("\(unreadableImportRows) \(unreadableImportRows == 1 ? "row" : "rows") in the file couldn't be read "
+                + "(a missing or out-of-range mood, flavour or date) and \(unreadableImportRows == 1 ? "was" : "were") left out.")
+        }
+        unreadableImportRows = 0
+        if !notes.isEmpty { importNotice = notes.joined(separator: " ") }
+    }
+}
+
+/// The files the Import menu can read.
+enum ImportFormat: String, CaseIterable, Identifiable {
+    case markdown, csv, json
+
+    var id: String { rawValue }
+
+    var menuTitle: String {
+        switch self {
+        case .markdown: "Markdown diary (.md)…"
+        case .csv: "Swing export (.csv)…"
+        case .json: "Swing export (.json)…"
+        }
+    }
+
+    var contentTypes: [UTType] {
+        switch self {
+        case .markdown: [.plainText]
+        case .csv: [.commaSeparatedText]
+        case .json: [.json]
         }
     }
 }

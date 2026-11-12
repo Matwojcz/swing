@@ -315,7 +315,7 @@ struct MoodDiagramView: View {
             .min { $0.distance < $1.distance }?.point
     }
 
-    /// The card for the hovered point: its day (or week, on the year scale) and the 30 days before and from it.
+    /// The card for the hovered point: its day (or week, on the year scale) and the 30 days before and after it.
     /// Placed above the dot, or below when the dot is near the top, and kept inside the page.
     private func hoverLayer(points: [MoodDataAggregator.DataPoint]) -> some View {
         GeometryReader { geo in

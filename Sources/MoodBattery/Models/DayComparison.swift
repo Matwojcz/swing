@@ -19,7 +19,8 @@ struct DayComparison: Equatable {
 
     /// The `windowDays` days before the day.
     let before: Window
-    /// The day and the days after it, up to `windowDays` and never past `today`.
+    /// The `windowDays` days after the day, never past `today`: fewer, or none, for a recent day.
+    /// The day itself is in neither window.
     let after: Window
 
     static func compare(entries: [MoodEntry], around day: Date, today: Date = Date(),
@@ -43,6 +44,6 @@ struct DayComparison: Equatable {
         }
 
         return DayComparison(before: window(from: -windowDays, count: windowDays),
-                                after: window(from: 0, count: windowDays))
+                                after: window(from: 1, count: windowDays))
     }
 }

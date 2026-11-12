@@ -25,19 +25,16 @@ struct MoodDiagramView: View {
     var highlightedEntry: MoodEntry?
     /// Entries matching the current search: nil when not searching. While searching, the line and dots are dimmed and every dot (or, on the year scale, week dot) holding a match gets a white ring.
     var searchMatches: [MoodEntry]?
-    /// Days marked by hand, drawn as dashed vertical lines with a label; clicking one shows the days around it.
-    var markers: [DiagramMarker] = []
-    /// Asks the parent to add a marker on a day (right-click a day on the week scale).
-    var onAddMarker: ((Date) -> Void)?
-    var onEditMarker: ((DiagramMarker) -> Void)?
-    var onDeleteMarker: ((DiagramMarker) -> Void)?
 
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
+    @Environment(\.cycleCalendar) private var cycle
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
     @State private var magnifyAnchor: CGFloat = 1.0
-    /// The marker whose card is open.
-    @State private var openMarkerID: Int64?
+    /// The plotted point under the pointer, by its date; its card shows the days around it.
+    @State private var hoveredDate: Date?
+    /// Width of one page's plot, for turning the pointer's position into a day.
+    @State private var plotWidth: CGFloat = 0
 
     private let height: CGFloat = 150
     private let verticalPadding: CGFloat = 14
@@ -200,7 +197,6 @@ struct MoodDiagramView: View {
                                 .contentShape(Rectangle())
                                 .position(x: px, y: py)
                                 .onTapGesture { onSelectDate?(dp.date) }
-                                .contextMenu { addMarkerMenu(for: dp.date) }
                         }
 
                         ForEach(0..<scale.dayCount, id: \.self) { dayIdx in
@@ -212,7 +208,6 @@ struct MoodDiagramView: View {
                                     .contentShape(Rectangle())
                                     .position(x: px, y: baselineY)
                                     .onTapGesture { onSelectDate?(days[dayIdx]) }
-                                    .contextMenu { addMarkerMenu(for: days[dayIdx]) }
                             }
                         }
                     }
@@ -240,9 +235,18 @@ struct MoodDiagramView: View {
                     }
                 }
 
-                markerLayer(days: days)
+                hoverLayer(points: tappablePoints)
             }
             .frame(height: height)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { plotWidth = $0 }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    hoveredDate = nearestPoint(in: tappablePoints, x: location.x)?.date
+                case .ended:
+                    hoveredDate = nil
+                }
+            }
 
             dayLabels(for: days)
         }
@@ -296,97 +300,46 @@ struct MoodDiagramView: View {
                   y: y(for: point.mood, height: size.height))
     }
 
-    // MARK: - Markers
+    // MARK: - Hover
 
-    /// The right-click menu on a day of the week scale.
-    @ViewBuilder
-    private func addMarkerMenu(for day: Date) -> some View {
-        if let onAddMarker {
-            Button("Add marker…") { onAddMarker(day) }
-        }
+    private static let hoverCardWidth: CGFloat = 230
+
+    /// The plotted point nearest the pointer, if it's within a day of it (half a week on the year scale).
+    private func nearestPoint(in points: [MoodDataAggregator.DataPoint], x: CGFloat) -> MoodDataAggregator.DataPoint? {
+        guard plotWidth > 0 else { return nil }
+        let position = Double(x / plotWidth) * Double(scale.dayCount) - 0.5
+        let reach = scale == .year ? 3.5 : 1.0
+        return points
+            .map { (point: $0, distance: abs(Double($0.dayIndex) - position)) }
+            .filter { $0.distance <= reach }
+            .min { $0.distance < $1.distance }?.point
     }
 
-    /// Dashed lines for the markers on this page, each with a small flag at the top that opens its card. Flags in
-    /// the last third of the page sit left of their line so they stay on the page; several on one day stack.
-    private func markerLayer(days: [Date]) -> some View {
-        var perDay: [Int: Int] = [:]
-        let placed: [(marker: DiagramMarker, index: Int, stack: Int)] = markers.compactMap { marker in
-            guard let day = marker.day(in: calendar), let index = days.firstIndex(of: day) else { return nil }
-            let stack = perDay[index, default: 0]
-            perDay[index] = stack + 1
-            return (marker, index, stack)
-        }
-        return GeometryReader { geo in
-            ForEach(placed, id: \.marker.id) { item in
-                let px = x(forDayIndex: item.index, totalDays: scale.dayCount, width: geo.size.width)
-                Path { path in
-                    path.move(to: CGPoint(x: px, y: 0))
-                    path.addLine(to: CGPoint(x: px, y: geo.size.height))
-                }
-                .stroke(Color.white.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                .allowsHitTesting(false)
-
-                let leftOfLine = item.index > scale.dayCount * 2 / 3
-                HStack(spacing: 0) {
-                    if leftOfLine {
-                        Spacer(minLength: 0)
-                        markerFlag(item.marker)
-                        Spacer().frame(width: max(0, geo.size.width - px))
-                    } else {
-                        Spacer().frame(width: px)
-                        markerFlag(item.marker)
-                        Spacer(minLength: 0)
-                    }
-                }
-                .frame(width: geo.size.width, alignment: .leading)
-                .offset(y: CGFloat(item.stack) * 20)
+    /// The card for the hovered point: its day (or week, on the year scale) and the 30 days before and from it.
+    /// Placed above the dot, or below when the dot is near the top, and kept inside the page.
+    private func hoverLayer(points: [MoodDataAggregator.DataPoint]) -> some View {
+        GeometryReader { geo in
+            if let hoveredDate, let point = points.first(where: { $0.date == hoveredDate }) {
+                let px = x(forDayIndex: point.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
+                let py = y(for: point.mood, height: geo.size.height)
+                let half = Self.hoverCardWidth / 2
+                let cardX = min(max(px, half), max(half, geo.size.width - half))
+                DayHoverCard(
+                    date: point.date,
+                    isWeek: scale == .year,
+                    mood: point.mood,
+                    label: MoodState.label(mood: point.mood, flavour: point.flavour, lens: lens,
+                                           cycle: cycle.position(of: point.date)),
+                    comparison: DayComparison.compare(entries: entries, around: point.date, calendar: calendar)
+                )
+                .frame(width: Self.hoverCardWidth)
+                .fixedSize(horizontal: false, vertical: true)
+                .position(x: cardX, y: py > geo.size.height * 0.55 ? py - 52 : py + 52)
+                .transition(.opacity)
             }
         }
-    }
-
-    /// A marker's flag: its kind's symbol and, except on the year scale, its label.
-    private func markerFlag(_ marker: DiagramMarker) -> some View {
-        Button {
-            openMarkerID = marker.id
-        } label: {
-            HStack(spacing: 3) {
-                Image(systemName: marker.kind.symbol)
-                    .font(.system(size: 9))
-                if scale != .year {
-                    Text(marker.label)
-                        .font(.system(size: 10, weight: .medium))
-                        .lineLimit(1)
-                        .frame(maxWidth: 130, alignment: .leading)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-            }
-            .foregroundStyle(.primary.opacity(0.85))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.tankSurface))
-            .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 0.5))
-        }
-        .buttonStyle(.plain)
-        .help(marker.label)
-        .accessibilityLabel("\(marker.kind.name) marker: \(marker.label)")
-        .popover(isPresented: Binding(
-            get: { openMarkerID != nil && openMarkerID == marker.id },
-            set: { if !$0, openMarkerID == marker.id { openMarkerID = nil } }
-        ), arrowEdge: .bottom) {
-            MarkerCard(
-                marker: marker,
-                comparison: MarkerComparison.compare(entries: entries, around: marker.day(in: calendar) ?? Date(),
-                                                     calendar: calendar),
-                onEdit: {
-                    openMarkerID = nil
-                    onEditMarker?(marker)
-                },
-                onDelete: {
-                    openMarkerID = nil
-                    onDeleteMarker?(marker)
-                }
-            )
-        }
+        .allowsHitTesting(false)
+        .animation(.easeOut(duration: 0.12), value: hoveredDate)
     }
 
     /// Zooms in one level (year→month, month→week) and navigates to the page containing the tapped date.
@@ -510,7 +463,6 @@ struct MoodDiagramView: View {
                         .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
                         .onTapGesture { onSelectDate?(day) }
-                        .contextMenu { addMarkerMenu(for: day) }
                 }
             case .month:
                 ForEach([0, 7, 14, 21, 29], id: \.self) { idx in

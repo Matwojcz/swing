@@ -31,7 +31,8 @@ mood (0-10, in 0.1 steps):
 Each entry is saved with an optional title and free-text note. The history
 list shows all entries with mood-colored indicators, and a diagram plots
 your mood over time across week, month, and year scales, with detected
-episodes, a run that is forming, and markers you place by hand.
+episodes and a run that is forming; hover a dot to compare the days
+around it.
 
 ## Features
 
@@ -53,18 +54,14 @@ episodes, a run that is forming, and markers you place by hand.
   Bipolar lens, "Day 3 in the hypomania range"). It fills in on the day it
   becomes an episode, or disappears without a trace if the run fades. It
   only counts days: no alerts, advice or predictions.
-- **Markers** — mark a day by hand (medication change, appointment, or
-  anything else) from the flag button in the entry panel, or by
-  right-clicking a day on the week scale. A marker is a dashed line with a
-  small labelled flag, at every scale (the year scale shows just the icon).
-  Clicking the flag shows the 30 days before and the days from the marker
-  on: average mood, days logged, days at 6.5 or above and below 3.5. It
-  describes what changed around the date, never why. Edit or delete it there.
+- **Hover a dot** — a small card shows that day's mood and band, and the
+  average of the 30 days before it next to the days from it on, with how
+  many days were logged in each (on the year scale, the dot's week). It says
+  what the numbers were, never why.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, note, or the tags). Shows the
-  entry's tags, an Auto-tag button, a flag button to add a diagram marker on
-  that day, and (in the PMDD lens) a "Period started on this day" checkbox.
-  Delete entries here.
+  entry's tags, an Auto-tag button, and (in the PMDD lens) a "Period started
+  on this day" checkbox. Delete entries here.
 - **On-device AI tagging** — Gemma 4 E2B, run locally through llama.cpp,
   reads an entry's title and note and picks up to four tags from a fixed list
   of feelings (low, flat, anxious, calm, hopeful, energised…): one or two for
@@ -181,9 +178,10 @@ own backup folder" setting will replace it. "Show iCloud backups in Finder"
 opens it.
 
 Table `periodStart` holds one `localDate` (`yyyy-MM-dd`, primary key) per
-logged period start, for the PMDD lens. Table `marker` holds the diagram
-markers: `id`, `localDate`, `label`, and `kind` (`medication`,
-`appointment` or `other`).
+logged period start, for the PMDD lens. Table `marker` (`id`,
+`localDate`, `label`, `kind`) holds day markers from a parked feature: the app
+no longer shows or adds them, but keeps the rows, and the MCP server lists
+them.
 
 ## MCP server (optional)
 
@@ -218,7 +216,7 @@ Tools:
 | `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |
 | `range_summary`       | `start`, `end?` (default today)                        | Exact numbers for a period (see below)   |
 | `mood_episodes`       | none                                                   | Every episode, and a run forming now     |
-| `list_markers`        | none                                                   | The markers placed on the diagram        |
+| `list_markers`        | none                                                   | Day markers (parked feature)             |
 
 The server follows the app's rules. A day holds one entry, so saving to a day
 that already has one is refused. Timestamps must be ISO 8601 (local time
@@ -269,7 +267,7 @@ Sources/MoodBattery/
   Entry/                     Gauge editor, text fields
   Tank/                      Gauge view, spark effects, mood colors
   History/                   Entry list, detail panel
-  Weekly/                    Mood diagram (week/month/year), markers
+  Weekly/                    Mood diagram (week/month/year), hover card
   Persistence/               SQLite store, database manager
   Import/                    Markdown diary importer
   Export/                    CSV and JSON export

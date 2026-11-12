@@ -32,6 +32,11 @@
 
 ## Ideas, not decided
 
+- **Markers (parked, 12 Nov).** Built in 1.3, taken out of the UI: placing them by hand adds daily friction, and
+  labelled flags collide on neighbouring days. If it comes back: the diary chat adds them when told ("went up to
+  150 mg today"), and the diagram draws a small tick under the date axis with the label only on hover. The two
+  markers made (3 and 4 Nov) are still in the `marker` table. The before/after comparison moved to hovering a dot.
+
 - Quick check-ins on the phone (several per day, the day drawn as a range). Changes the one-entry-per-day model.
 - Year in pixels: one coloured square per day, filterable by tag.
 - Touch ID lock.

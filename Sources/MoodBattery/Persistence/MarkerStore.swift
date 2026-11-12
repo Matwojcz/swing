@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// The markers placed by hand on the diagram.
+/// The markers placed by hand on the diagram. Parked with `DiagramMarker`: nothing in the app uses it for now.
 struct MarkerStore {
     let dbQueue: DatabaseQueue
 

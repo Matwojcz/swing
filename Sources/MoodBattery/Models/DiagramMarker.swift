@@ -1,7 +1,8 @@
 import Foundation
 
-/// A day marked by hand on the diagram, such as a medication change or an appointment, to see the mood line against it.
-/// Placed by the user, never inferred, so it's as reliable as the user's own record.
+/// A day marked by hand, such as a medication change or an appointment. Parked (Nov 2026): the app no longer shows or
+/// adds markers, but the table and the rows already made are kept so the idea can come back (see NEXT_ACTIONS.md).
+/// The MCP server still lists them.
 struct DiagramMarker: Identifiable, Codable, Equatable {
     enum Kind: String, Codable, CaseIterable, Identifiable {
         case medication, appointment, other

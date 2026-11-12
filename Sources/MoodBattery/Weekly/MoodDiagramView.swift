@@ -31,8 +31,14 @@ struct MoodDiagramView: View {
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
     @State private var magnifyAnchor: CGFloat = 1.0
-    /// The plotted point under the pointer, by its date; its card shows the days around it.
+    /// The plotted point under the pointer, by its date; its card shows the day.
     @State private var hoveredDate: Date?
+    /// Shows the card once the pointer has rested on a dot for `hoverDelay`, so passing over dots doesn't flash cards.
+    @State private var hoverIntent: Task<Void, Never>?
+    /// The date the pointer is resting on, before its card shows.
+    @State private var pendingHoverDate: Date?
+    /// True while the diagram scrolls between pages; no cards then.
+    @State private var isScrolling = false
     /// Width of one page's plot, for turning the pointer's position into a day.
     @State private var plotWidth: CGFloat = 0
 
@@ -106,6 +112,11 @@ struct MoodDiagramView: View {
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: $currentPage, anchor: .center)
             .defaultScrollAnchor(.trailing)
+            .modifier(ScrollPhaseTracker(isScrolling: $isScrolling))
+            .onChange(of: isScrolling) { _, scrolling in
+                if scrolling { clearHover() }
+            }
+            .onChange(of: currentPage) { _, _ in clearHover() }
             .frame(height: height + 30)
 
             if let forming {
@@ -242,9 +253,9 @@ struct MoodDiagramView: View {
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
-                    hoveredDate = nearestPoint(in: tappablePoints, x: location.x)?.date
+                    hover(nearestPoint(in: tappablePoints, at: location)?.date)
                 case .ended:
-                    hoveredDate = nil
+                    clearHover()
                 }
             }
 
@@ -304,15 +315,45 @@ struct MoodDiagramView: View {
 
     private static let hoverCardWidth: CGFloat = 230
 
-    /// The plotted point nearest the pointer, if it's within a day of it (half a week on the year scale).
-    private func nearestPoint(in points: [MoodDataAggregator.DataPoint], x: CGFloat) -> MoodDataAggregator.DataPoint? {
+    /// How close the pointer must come to a dot's centre, in points, for its card.
+    private static let hoverRadius: CGFloat = 14
+    /// How long the pointer rests on a dot before its card shows.
+    private static let hoverDelay: Duration = .milliseconds(250)
+
+    /// The dot under the pointer: the nearest one within `hoverRadius` of it, measured in both directions.
+    private func nearestPoint(in points: [MoodDataAggregator.DataPoint], at location: CGPoint) -> MoodDataAggregator.DataPoint? {
         guard plotWidth > 0 else { return nil }
-        let position = Double(x / plotWidth) * Double(scale.dayCount) - 0.5
-        let reach = scale == .year ? 3.5 : 1.0
         return points
-            .map { (point: $0, distance: abs(Double($0.dayIndex) - position)) }
-            .filter { $0.distance <= reach }
+            .map { point -> (point: MoodDataAggregator.DataPoint, distance: CGFloat) in
+                let dx = x(forDayIndex: point.dayIndex, totalDays: scale.dayCount, width: plotWidth) - location.x
+                let dy = y(for: point.mood, height: height) - location.y
+                return (point, (dx * dx + dy * dy).squareRoot())
+            }
+            .filter { $0.distance <= Self.hoverRadius }
             .min { $0.distance < $1.distance }?.point
+    }
+
+    /// Follows the pointer: leaving a dot hides its card at once; resting on one shows its card after `hoverDelay`.
+    private func hover(_ date: Date?) {
+        guard date != pendingHoverDate else { return }
+        hoverIntent?.cancel()
+        pendingHoverDate = date
+        guard let date, !isScrolling else {
+            hoveredDate = nil
+            return
+        }
+        if hoveredDate != nil { hoveredDate = nil }
+        hoverIntent = Task {
+            try? await Task.sleep(for: Self.hoverDelay)
+            guard !Task.isCancelled, !isScrolling, pendingHoverDate == date else { return }
+            hoveredDate = date
+        }
+    }
+
+    private func clearHover() {
+        hoverIntent?.cancel()
+        pendingHoverDate = nil
+        hoveredDate = nil
     }
 
     /// The tags of the day's entries, in order, without repeats.
@@ -773,6 +814,21 @@ struct MoodDiagramView: View {
                               width: radius * 2, height: radius * 2)
             context.fill(Path(ellipseIn: rect), with: .color(p.color))
             context.stroke(Path(ellipseIn: rect), with: .color(.tankBorder), lineWidth: 1)
+        }
+    }
+}
+
+/// Reports whether a scroll view is scrolling (macOS 15 and later; on 14 the page change alone clears the card).
+private struct ScrollPhaseTracker: ViewModifier {
+    @Binding var isScrolling: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.onScrollPhaseChange { _, phase in
+                isScrolling = phase != .idle
+            }
+        } else {
+            content
         }
     }
 }

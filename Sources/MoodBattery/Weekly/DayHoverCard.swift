@@ -30,16 +30,9 @@ struct DayHoverCard: View {
                     .foregroundStyle(MoodColor.color(mood: mood, flavour: 0.3))
                     .lineLimit(1)
             }
-            row(title: "\(DayComparison.windowDays) days before", window: comparison.before)
-            if comparison.after.days == 0 {
-                Text("Nothing after yet")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            } else {
-                row(title: comparison.after.days < DayComparison.windowDays
-                        ? "\(comparison.after.days) \(comparison.after.days == 1 ? "day" : "days") after, to today"
-                        : "\(DayComparison.windowDays) days after",
-                    window: comparison.after)
+            row(title: Self.days(comparison.before.days, "before"), window: comparison.before)
+            if comparison.after.days > 0 {
+                row(title: Self.days(comparison.after.days, "after"), window: comparison.after)
             }
         }
         .padding(.horizontal, 10)
@@ -49,7 +42,12 @@ struct DayHoverCard: View {
         .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
     }
 
-    private func row(title: String, window: DayComparison.Window) -> some View {
+    /// "30 days before", "1 day after".
+    private static func days(_ count: Int, _ side: String) -> String {
+        "\(count) \(count == 1 ? "day" : "days") \(side)"
+    }
+
+        private func row(title: String, window: DayComparison.Window) -> some View {
         HStack(spacing: 6) {
             Text(title)
                 .foregroundStyle(.secondary)

@@ -59,8 +59,8 @@ around it.
   becomes an episode, or disappears without a trace if the run fades. It
   only counts days: no alerts, advice or predictions.
 - **Hover a dot** — a small card shows that day's mood and band, and the
-  average of the 30 days before it next to the 30 days after it (or the days
-  after it so far, for a recent day), with how many days were logged in each.
+  average of the 30 days before it next to the 30 days after it (fewer for a
+  recent day, none for today), with how many days were logged in each.
   On the year scale the dot is a week. It says what the numbers were, never
   why.
 - **Entry detail panel** — tap any entry to view and inline-edit all

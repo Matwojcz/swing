@@ -16,8 +16,6 @@ struct EntryDetailPanel: View {
     var autoTagDisabled = false
     /// Marks or unmarks the entry's day as a period start (PMDD lens only).
     var onPeriodStartChange: ((Date, Bool) -> Void)?
-    /// Opens the sheet for adding a diagram marker on the entry's day.
-    var onAddMarker: (() -> Void)?
     /// True while a field is being edited. The window's Escape handler runs before the panel's own, so it reads
     /// this to end the edit (by setting it to false) instead of closing the panel.
     var isEditing: Binding<Bool> = .constant(false)
@@ -142,16 +140,6 @@ struct EntryDetailPanel: View {
                 .help(entry.moodTags.isEmpty ? "Tag this entry with the on-device model"
                       : entry.hasManualTags ? "Replace the tags you picked with the on-device model's"
                       : "Re-tag this entry with the on-device model")
-            }
-            if let onAddMarker {
-                Button(action: onAddMarker) {
-                    Image(systemName: "flag")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Add a marker on this day")
-                .accessibilityLabel("Add marker")
             }
             if let onDelete {
                 Button(action: onDelete) {

@@ -25,19 +25,22 @@ struct MoodDiagramView: View {
     var highlightedEntry: MoodEntry?
     /// Entries matching the current search: nil when not searching. While searching, the line and dots are dimmed and every dot (or, on the year scale, week dot) holding a match gets a white ring.
     var searchMatches: [MoodEntry]?
-    /// Days marked by hand, drawn as dashed vertical lines with a label; clicking one shows the days around it.
-    var markers: [DiagramMarker] = []
-    /// Asks the parent to add a marker on a day (right-click a day on the week scale).
-    var onAddMarker: ((Date) -> Void)?
-    var onEditMarker: ((DiagramMarker) -> Void)?
-    var onDeleteMarker: ((DiagramMarker) -> Void)?
 
     @AppStorage(Lens.storageKey) private var lens: Lens = .none
+    @Environment(\.cycleCalendar) private var cycle
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
     @State private var magnifyAnchor: CGFloat = 1.0
-    /// The marker whose card is open.
-    @State private var openMarkerID: Int64?
+    /// The plotted point under the pointer, by its date; its card shows the day.
+    @State private var hoveredDate: Date?
+    /// Shows the card once the pointer has rested on a dot for `hoverDelay`, so passing over dots doesn't flash cards.
+    @State private var hoverIntent: Task<Void, Never>?
+    /// The date the pointer is resting on, before its card shows.
+    @State private var pendingHoverDate: Date?
+    /// True while the diagram scrolls between pages; no cards then.
+    @State private var isScrolling = false
+    /// Width of one page's plot, for turning the pointer's position into a day.
+    @State private var plotWidth: CGFloat = 0
 
     private let height: CGFloat = 150
     private let verticalPadding: CGFloat = 14
@@ -109,6 +112,11 @@ struct MoodDiagramView: View {
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: $currentPage, anchor: .center)
             .defaultScrollAnchor(.trailing)
+            .modifier(ScrollPhaseTracker(isScrolling: $isScrolling))
+            .onChange(of: isScrolling) { _, scrolling in
+                if scrolling { clearHover() }
+            }
+            .onChange(of: currentPage) { _, _ in clearHover() }
             .frame(height: height + 30)
 
             if let forming {
@@ -200,7 +208,6 @@ struct MoodDiagramView: View {
                                 .contentShape(Rectangle())
                                 .position(x: px, y: py)
                                 .onTapGesture { onSelectDate?(dp.date) }
-                                .contextMenu { addMarkerMenu(for: dp.date) }
                         }
 
                         ForEach(0..<scale.dayCount, id: \.self) { dayIdx in
@@ -212,7 +219,6 @@ struct MoodDiagramView: View {
                                     .contentShape(Rectangle())
                                     .position(x: px, y: baselineY)
                                     .onTapGesture { onSelectDate?(days[dayIdx]) }
-                                    .contextMenu { addMarkerMenu(for: days[dayIdx]) }
                             }
                         }
                     }
@@ -240,9 +246,18 @@ struct MoodDiagramView: View {
                     }
                 }
 
-                markerLayer(days: days)
+                hoverLayer(points: tappablePoints)
             }
             .frame(height: height)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { plotWidth = $0 }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    hover(nearestPoint(in: tappablePoints, at: location)?.date)
+                case .ended:
+                    clearHover()
+                }
+            }
 
             dayLabels(for: days)
         }
@@ -296,97 +311,89 @@ struct MoodDiagramView: View {
                   y: y(for: point.mood, height: size.height))
     }
 
-    // MARK: - Markers
+    // MARK: - Hover
 
-    /// The right-click menu on a day of the week scale.
-    @ViewBuilder
-    private func addMarkerMenu(for day: Date) -> some View {
-        if let onAddMarker {
-            Button("Add marker…") { onAddMarker(day) }
+    private static let hoverCardWidth: CGFloat = 230
+
+    /// How close the pointer must come to a dot's centre, in points, for its card.
+    private static let hoverRadius: CGFloat = 14
+    /// How long the pointer rests on a dot before its card shows.
+    private static let hoverDelay: Duration = .milliseconds(250)
+
+    /// The dot under the pointer: the nearest one within `hoverRadius` of it, measured in both directions.
+    private func nearestPoint(in points: [MoodDataAggregator.DataPoint], at location: CGPoint) -> MoodDataAggregator.DataPoint? {
+        guard plotWidth > 0 else { return nil }
+        return points
+            .map { point -> (point: MoodDataAggregator.DataPoint, distance: CGFloat) in
+                let dx = x(forDayIndex: point.dayIndex, totalDays: scale.dayCount, width: plotWidth) - location.x
+                let dy = y(for: point.mood, height: height) - location.y
+                return (point, (dx * dx + dy * dy).squareRoot())
+            }
+            .filter { $0.distance <= Self.hoverRadius }
+            .min { $0.distance < $1.distance }?.point
+    }
+
+    /// Follows the pointer: leaving a dot hides its card at once; resting on one shows its card after `hoverDelay`.
+    private func hover(_ date: Date?) {
+        guard date != pendingHoverDate else { return }
+        hoverIntent?.cancel()
+        pendingHoverDate = date
+        guard let date, !isScrolling else {
+            hoveredDate = nil
+            return
+        }
+        if hoveredDate != nil { hoveredDate = nil }
+        hoverIntent = Task {
+            try? await Task.sleep(for: Self.hoverDelay)
+            guard !Task.isCancelled, !isScrolling, pendingHoverDate == date else { return }
+            hoveredDate = date
         }
     }
 
-    /// Dashed lines for the markers on this page, each with a small flag at the top that opens its card. Flags in
-    /// the last third of the page sit left of their line so they stay on the page; several on one day stack.
-    private func markerLayer(days: [Date]) -> some View {
-        var perDay: [Int: Int] = [:]
-        let placed: [(marker: DiagramMarker, index: Int, stack: Int)] = markers.compactMap { marker in
-            guard let day = marker.day(in: calendar), let index = days.firstIndex(of: day) else { return nil }
-            let stack = perDay[index, default: 0]
-            perDay[index] = stack + 1
-            return (marker, index, stack)
-        }
-        return GeometryReader { geo in
-            ForEach(placed, id: \.marker.id) { item in
-                let px = x(forDayIndex: item.index, totalDays: scale.dayCount, width: geo.size.width)
-                Path { path in
-                    path.move(to: CGPoint(x: px, y: 0))
-                    path.addLine(to: CGPoint(x: px, y: geo.size.height))
-                }
-                .stroke(Color.white.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                .allowsHitTesting(false)
-
-                let leftOfLine = item.index > scale.dayCount * 2 / 3
-                HStack(spacing: 0) {
-                    if leftOfLine {
-                        Spacer(minLength: 0)
-                        markerFlag(item.marker)
-                        Spacer().frame(width: max(0, geo.size.width - px))
-                    } else {
-                        Spacer().frame(width: px)
-                        markerFlag(item.marker)
-                        Spacer(minLength: 0)
-                    }
-                }
-                .frame(width: geo.size.width, alignment: .leading)
-                .offset(y: CGFloat(item.stack) * 20)
-            }
-        }
+    private func clearHover() {
+        hoverIntent?.cancel()
+        pendingHoverDate = nil
+        hoveredDate = nil
     }
 
-    /// A marker's flag: its kind's symbol and, except on the year scale, its label.
-    private func markerFlag(_ marker: DiagramMarker) -> some View {
-        Button {
-            openMarkerID = marker.id
-        } label: {
-            HStack(spacing: 3) {
-                Image(systemName: marker.kind.symbol)
-                    .font(.system(size: 9))
-                if scale != .year {
-                    Text(marker.label)
-                        .font(.system(size: 10, weight: .medium))
-                        .lineLimit(1)
-                        .frame(maxWidth: 130, alignment: .leading)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
+    /// The tags of the day's entries, in order, without repeats.
+    private func tags(on day: Date) -> [MoodTag] {
+        var seen: [MoodTag] = []
+        for entry in entries where entry.day(in: calendar) == day {
+            for tag in entry.moodTags where !seen.contains(tag) { seen.append(tag) }
+        }
+        return seen
+    }
+
+    /// The card for the hovered point: its day (or week, on the year scale), its tags, and whether it stands out.
+    /// Placed above the dot, or below when the dot is near the top, and kept inside the page.
+    private func hoverLayer(points: [MoodDataAggregator.DataPoint]) -> some View {
+        GeometryReader { geo in
+            if let hoveredDate, let point = points.first(where: { $0.date == hoveredDate }) {
+                let px = x(forDayIndex: point.dayIndex, totalDays: scale.dayCount, width: geo.size.width)
+                let py = y(for: point.mood, height: geo.size.height)
+                let half = Self.hoverCardWidth / 2
+                let cardX = min(max(px, half), max(half, geo.size.width - half))
+                let isWeek = scale == .year
+                DayHoverCard(
+                    date: point.date,
+                    isWeek: isWeek,
+                    mood: point.mood,
+                    low: point.low,
+                    high: point.high,
+                    label: MoodState.label(mood: point.mood, flavour: point.flavour, lens: lens,
+                                           cycle: cycle.position(of: point.date)),
+                    tags: isWeek ? [] : tags(on: point.date),
+                    record: isWeek ? nil : DayRecord.find(for: point.date, entries: entries, calendar: calendar)
+                )
+                .frame(width: Self.hoverCardWidth)
+                .fixedSize(horizontal: false, vertical: true)
+                .position(x: cardX, y: py > geo.size.height * 0.55 ? py - 52 : py + 52)
+                .transition(.opacity)
             }
-            .foregroundStyle(.primary.opacity(0.85))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.tankSurface))
-            .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
-        .help(marker.label)
-        .accessibilityLabel("\(marker.kind.name) marker: \(marker.label)")
-        .popover(isPresented: Binding(
-            get: { openMarkerID != nil && openMarkerID == marker.id },
-            set: { if !$0, openMarkerID == marker.id { openMarkerID = nil } }
-        ), arrowEdge: .bottom) {
-            MarkerCard(
-                marker: marker,
-                comparison: MarkerComparison.compare(entries: entries, around: marker.day(in: calendar) ?? Date(),
-                                                     calendar: calendar),
-                onEdit: {
-                    openMarkerID = nil
-                    onEditMarker?(marker)
-                },
-                onDelete: {
-                    openMarkerID = nil
-                    onDeleteMarker?(marker)
-                }
-            )
-        }
+        .allowsHitTesting(false)
+        .animation(.easeOut(duration: 0.12), value: hoveredDate)
     }
 
     /// Zooms in one level (year→month, month→week) and navigates to the page containing the tapped date.
@@ -510,7 +517,6 @@ struct MoodDiagramView: View {
                         .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
                         .onTapGesture { onSelectDate?(day) }
-                        .contextMenu { addMarkerMenu(for: day) }
                 }
             case .month:
                 ForEach([0, 7, 14, 21, 29], id: \.self) { idx in
@@ -624,7 +630,21 @@ struct MoodDiagramView: View {
     /// Maps a mood value to its vertical position (0=top/hype, max=bottom/depressive) within the canvas height.
     private func y(for mood: Double, height: CGFloat) -> CGFloat {
         let usable = height - verticalPadding * 2
-        return verticalPadding + CGFloat(1 - MoodScale.normalized(mood)) * usable
+        let drawn = scale == .week ? Self.weekStretched(mood) : mood
+        return verticalPadding + CGFloat(1 - MoodScale.normalized(drawn)) * usable
+    }
+
+    /// The week scale spreads 7 days over the width the month scale uses for 30, so the same day-to-day moves look
+    /// far gentler there. It draws distances from baseline this many times larger to read like the other scales.
+    static let weekStretch = 1.5
+
+    /// Stretches `mood`'s distance from baseline by `weekStretch`, easing off towards the ends so 0 and 10 stay at the
+    /// edges and extreme days stay apart instead of clipping. Order is kept: a higher mood is always drawn higher. The
+    /// diagram has no scale, so only the drawing changes; values, bands and the hover card are untouched.
+    static func weekStretched(_ mood: Double) -> Double {
+        let half = (MoodScale.max - MoodScale.min) / 2
+        let distance = (mood - MoodScale.baseline) / half
+        return MoodScale.baseline + half * tanh(weekStretch * distance) / tanh(weekStretch)
     }
 
     // MARK: - Drawing
@@ -757,6 +777,20 @@ struct MoodDiagramView: View {
         }
         guard !plotted.isEmpty else { return }
 
+        // The year scale's points are weekly averages: a faint bar from each week's lowest to highest day keeps the
+        // real range in view, so the year doesn't look calmer than the weeks it's made of.
+        if scale == .year {
+            for dp in points {
+                guard let low = dp.low, let high = dp.high, high > low else { continue }
+                let px = x(forDayIndex: dp.dayIndex, totalDays: totalDays, width: size.width)
+                var bar = Path()
+                bar.move(to: CGPoint(x: px, y: y(for: high, height: size.height)))
+                bar.addLine(to: CGPoint(x: px, y: y(for: low, height: size.height)))
+                context.stroke(bar, with: .color(MoodColor.color(mood: dp.mood, flavour: dp.flavour).opacity(0.35)),
+                               style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            }
+        }
+
         if plotted.count > 1 {
             for i in 1..<plotted.count {
                 let a = plotted[i - 1]
@@ -780,6 +814,21 @@ struct MoodDiagramView: View {
                               width: radius * 2, height: radius * 2)
             context.fill(Path(ellipseIn: rect), with: .color(p.color))
             context.stroke(Path(ellipseIn: rect), with: .color(.tankBorder), lineWidth: 1)
+        }
+    }
+}
+
+/// Reports whether a scroll view is scrolling (macOS 15 and later; on 14 the page change alone clears the card).
+private struct ScrollPhaseTracker: ViewModifier {
+    @Binding var isScrolling: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.onScrollPhaseChange { _, phase in
+                isScrolling = phase != .idle
+            }
+        } else {
+            content
         }
     }
 }

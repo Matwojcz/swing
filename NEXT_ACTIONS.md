@@ -21,6 +21,9 @@
 - **iPhone port.** Plan in `docs/IOS_PORT_PLAN.md` (iPhone 15 Pro, sync through an iCloud Drive folder). Next is
   phase 0: spikes for free signing, SideStore refresh and the shared folder, plus a quick test of Apple's built-in
   model against diary text, and whether a free-signed app may read sleep from Apple Health.
+- **Sleep on the hover card (with the iPhone work).** If phase 0 shows a free-signed app can read Apple Health,
+  add the night's sleep to the diagram's hover card ("5h 10m sleep the night before"): the one thing the diagram
+  can't show by itself.
 
 - **Pick your own backup folder (setting in the app).** The second backup copy goes to a fixed path for now,
   `iCloud Drive/Swing/database-backups`, which only exists on a Mac with iCloud Drive. Before the cross-platform
@@ -31,6 +34,11 @@
   `DatabaseManager.iCloudBackupDirectory`.
 
 ## Ideas, not decided
+
+- **Markers (parked, 12 Nov).** Built in 1.3, taken out of the UI: placing them by hand adds daily friction, and
+  labelled flags collide on neighbouring days. If it comes back: the diary chat adds them when told ("went up to
+  150 mg today"), and the diagram draws a small tick under the date axis with the label only on hover. The two
+  markers made (3 and 4 Nov) are still in the `marker` table. The before/after comparison moved to hovering a dot.
 
 - Quick check-ins on the phone (several per day, the day drawn as a range). Changes the one-entry-per-day model.
 - Year in pixels: one coloured square per day, filterable by tag.

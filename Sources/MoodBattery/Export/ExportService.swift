@@ -3,9 +3,9 @@ import Foundation
 /// Serialises mood entries to CSV or JSON. Pure formatting — no file I/O and no UI, so the caller
 /// (ContentView, tests, or future automation) picks how the bytes leave the process.
 enum ExportService {
-    /// Builds a CSV representation with a header row and ISO-8601 timestamps.
+    /// Builds a CSV representation with a header row and ISO-8601 timestamps. `ExportFileImporter` reads it back.
     static func csv(from entries: [MoodEntry]) -> String {
-        let header = "id,mood,flavour,title,note,timestamp,localDate,tags"
+        let header = "id,mood,flavour,title,note,timestamp,localDate,tags,tagModelVersion"
         let rows = entries.map { e in
             let fields: [String] = [
                 e.id.map(String.init) ?? "",
@@ -15,7 +15,8 @@ enum ExportService {
                 csvEscape(e.note ?? ""),
                 iso8601Formatter.string(from: e.timestamp),
                 e.localDate,
-                e.tags.joined(separator: ";")
+                e.tags.joined(separator: ";"),
+                csvEscape(e.tagModelVersion ?? "")
             ]
             return fields.joined(separator: ",")
         }

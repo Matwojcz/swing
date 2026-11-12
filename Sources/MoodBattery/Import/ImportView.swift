@@ -7,6 +7,10 @@ struct EditableImportEntry: Identifiable {
     var title: String
     var note: String
     var timestamp: Date
+    /// From an export: the day as recorded, and the tags with where they came from. Nil or empty from a diary file.
+    var localDate: String? = nil
+    var tags: [String] = []
+    var tagModelVersion: String? = nil
 
     init(parsed: MarkdownImporter.ParsedEntry) {
         self.mood = parsed.mood
@@ -14,6 +18,24 @@ struct EditableImportEntry: Identifiable {
         self.title = parsed.title
         self.note = parsed.note
         self.timestamp = parsed.timestamp
+    }
+
+    init(entry: MoodEntry) {
+        self.mood = entry.mood
+        self.flavour = entry.flavour
+        self.title = entry.title ?? ""
+        self.note = entry.note ?? ""
+        self.timestamp = entry.timestamp
+        self.localDate = entry.localDate
+        self.tags = entry.tags
+        self.tagModelVersion = entry.tagModelVersion
+    }
+
+    /// The entry to save, keeping the recorded day and tags when the file had them.
+    var moodEntry: MoodEntry {
+        MoodEntry(id: nil, mood: mood, flavour: flavour,
+                  title: title.isEmpty ? nil : title, note: note.isEmpty ? nil : note,
+                  timestamp: timestamp, localDate: localDate, tags: tags, tagModelVersion: tagModelVersion)
     }
 }
 

@@ -1,6 +1,6 @@
 # Swing
 
-**v1.3**
+**v1.4**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time. Labels use neutral everyday words
@@ -31,7 +31,8 @@ mood (0-10, in 0.1 steps):
 Each entry is saved with an optional title and free-text note. The history
 list shows all entries with mood-colored indicators, and a diagram plots
 your mood over time across week, month, and year scales, with detected
-episodes, a run that is forming, and markers you place by hand.
+episodes and a run that is forming; hover a dot to compare the days
+around it.
 
 ## Features
 
@@ -41,7 +42,11 @@ episodes, a run that is forming, and markers you place by hand.
   magnification on hover and liquid glass effects (macOS 26+).
 - **Mood diagram** — mood over time with a mood-colored line. Week, month,
   and year scales with pinch-to-zoom, paging, and continuous lines across
-  page boundaries. The year scale shows weekly averages. Detected mood
+  page boundaries. The year scale shows weekly averages, each with a faint
+  bar from the week's lowest to highest day so the real range stays in view.
+  The week scale spreads days out, which makes the same moves look gentler,
+  so it draws distances from baseline 1.5 times larger, easing off towards the
+  ends (the diagram has no scale; values and the hover card are unchanged). Detected mood
   episodes appear as tinted bands behind the line: depressive (mood below
   3.5 for at least 14 days) and elevated (6.5 or above for at least 4 days),
   following DSM-5 bipolar II durations. Runs tolerate a couple of unlogged or
@@ -53,18 +58,15 @@ episodes, a run that is forming, and markers you place by hand.
   Bipolar lens, "Day 3 in the hypomania range"). It fills in on the day it
   becomes an episode, or disappears without a trace if the run fades. It
   only counts days: no alerts, advice or predictions.
-- **Markers** — mark a day by hand (medication change, appointment, or
-  anything else) from the flag button in the entry panel, or by
-  right-clicking a day on the week scale. A marker is a dashed line with a
-  small labelled flag, at every scale (the year scale shows just the icon).
-  Clicking the flag shows the 30 days before and the days from the marker
-  on: average mood, days logged, days at 6.5 or above and below 3.5. It
-  describes what changed around the date, never why. Edit or delete it there.
+- **Hover a dot** — rest the pointer on a dot (it doesn't react while
+  scrolling or passing over) and a small card shows that day's mood, band and tags, and a
+  line when the day stands out: "Lowest since 26 Oct" or "Highest since 14
+  Jul" (only when it's the lowest or highest for at least two weeks). On the
+  year scale the dot is a week: its average and its lowest and highest day.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, note, or the tags). Shows the
-  entry's tags, an Auto-tag button, a flag button to add a diagram marker on
-  that day, and (in the PMDD lens) a "Period started on this day" checkbox.
-  Delete entries here.
+  entry's tags, an Auto-tag button, and (in the PMDD lens) a "Period started
+  on this day" checkbox. Delete entries here.
 - **On-device AI tagging** — Gemma 4 E2B, run locally through llama.cpp,
   reads an entry's title and note and picks up to four tags from a fixed list
   of feelings (low, flat, anxious, calm, hopeful, energised…): one or two for
@@ -87,10 +89,13 @@ episodes, a run that is forming, and markers you place by hand.
 - **Retrospective entries** — tap an empty date in the week diagram to log
   for a past day; the "Logging for…" line has a cancel button, and ESC
   cancels it too. One entry per day is enforced.
-- **Markdown import** — import `.md` diary files with a preview sheet.
-  Parses dates and mood/flavour from field lines (`Mood: 4.8. Flavour: 0.4`,
-  one per line or together) or estimates them from the text. Days that
-  already have an entry are skipped.
+- **Import** — the toolbar Import menu reads three kinds of file, each
+  shown in a review sheet before anything is saved. A Markdown diary (`.md`):
+  dates and mood/flavour come from field lines (`Mood: 4.8. Flavour: 0.4`, one
+  per line or together) or are estimated from the text. A Swing export (`.csv`
+  or `.json`): entries come back as exported, with their day and tags (and
+  whether the tags were picked by hand); rows with a missing or out-of-range
+  value are left out and counted. Days that already have an entry are skipped.
 - **Search** — the toolbar search field has two kinds of search, and every
   word must match. Plain words find tags ("lonely") and mood band names in the
   current lens ("lifted", "hypomania") and nothing else, so low means low days,
@@ -107,8 +112,9 @@ episodes, a run that is forming, and markers you place by hand.
   row shows why it matched (an outlined tag, a highlighted title, or the
   matching line of the note or band name), and the detail panel highlights the
   same. Up/down arrows step through the matches, Return jumps to the newest one.
-- **Data export and backups** — export all entries (with their tags) as CSV or
-  JSON from the toolbar menu, which also opens the two backup folders (see
+- **Data export and backups** — export all entries (with their tags and where
+  the tags came from) as CSV or JSON from the toolbar menu; Import reads both
+  back. The same menu which also opens the two backup folders (see
   Database) and has "Clear all entries". Debug builds add a dummy-data
   seeder there.
 - **MCP server** — Python server for Claude integration (log, query,
@@ -181,9 +187,10 @@ own backup folder" setting will replace it. "Show iCloud backups in Finder"
 opens it.
 
 Table `periodStart` holds one `localDate` (`yyyy-MM-dd`, primary key) per
-logged period start, for the PMDD lens. Table `marker` holds the diagram
-markers: `id`, `localDate`, `label`, and `kind` (`medication`,
-`appointment` or `other`).
+logged period start, for the PMDD lens. Table `marker` (`id`,
+`localDate`, `label`, `kind`) holds day markers from a parked feature: the app
+no longer shows or adds them, but keeps the rows, and the MCP server lists
+them.
 
 ## MCP server (optional)
 
@@ -218,7 +225,7 @@ Tools:
 | `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |
 | `range_summary`       | `start`, `end?` (default today)                        | Exact numbers for a period (see below)   |
 | `mood_episodes`       | none                                                   | Every episode, and a run forming now     |
-| `list_markers`        | none                                                   | The markers placed on the diagram        |
+| `list_markers`        | none                                                   | Day markers (parked feature)             |
 
 The server follows the app's rules. A day holds one entry, so saving to a day
 that already has one is refused. Timestamps must be ISO 8601 (local time
@@ -269,9 +276,9 @@ Sources/MoodBattery/
   Entry/                     Gauge editor, text fields
   Tank/                      Gauge view, spark effects, mood colors
   History/                   Entry list, detail panel
-  Weekly/                    Mood diagram (week/month/year), markers
+  Weekly/                    Mood diagram (week/month/year), hover card
   Persistence/               SQLite store, database manager
-  Import/                    Markdown diary importer
+  Import/                    Markdown diary and CSV/JSON export importers
   Export/                    CSV and JSON export
   Models/                    MoodEntry, mood scale, episode detection,
                              per-day/week aggregation, menstrual cycle calendar

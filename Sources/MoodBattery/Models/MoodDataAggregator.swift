@@ -11,6 +11,9 @@ enum MoodDataAggregator {
         var mood: Double
         var flavour: Double
         var date: Date
+        /// For a weekly point, its lowest and highest day (each day's own average); nil for a daily point.
+        var low: Double? = nil
+        var high: Double? = nil
     }
 
     /// Computes one averaged data point per day in `days`, skipping days with no entries.
@@ -30,7 +33,8 @@ enum MoodDataAggregator {
         }
     }
 
-    /// Aggregates entries into fixed 7-day chunks across `days`, placing each averaged point at the chunk's midpoint index. Used by the year-scale diagram.
+    /// Aggregates entries into fixed 7-day chunks across `days`, placing each averaged point at the chunk's midpoint index,
+    /// with the chunk's lowest and highest day. Used by the year-scale diagram.
     static func weeklyAverages(entries: [MoodEntry], days: [Date], calendar: Calendar = .current) -> [DataPoint] {
         let grouped = groupByDay(entries: entries, calendar: calendar)
         var points: [DataPoint] = []
@@ -43,15 +47,17 @@ enum MoodDataAggregator {
             var moodSum = 0.0
             var flavourSum = 0.0
             var count = 0.0
+            var dayMoods: [Double] = []
 
             for i in startIdx..<(startIdx + chunkSize) {
                 let key = calendar.startOfDay(for: days[i])
-                if let dayEntries = grouped[key] {
+                if let dayEntries = grouped[key], !dayEntries.isEmpty {
                     for e in dayEntries {
                         moodSum += e.mood
                         flavourSum += e.flavour
                         count += 1
                     }
+                    dayMoods.append(dayEntries.reduce(0) { $0 + $1.mood } / Double(dayEntries.count))
                 }
             }
 
@@ -60,7 +66,9 @@ enum MoodDataAggregator {
                     dayIndex: midIdx,
                     mood: moodSum / count,
                     flavour: flavourSum / count,
-                    date: days[midIdx]
+                    date: days[midIdx],
+                    low: dayMoods.min(),
+                    high: dayMoods.max()
                 ))
             }
         }

@@ -2,8 +2,6 @@
 
 ## For Mat
 
-- **24 May 2026 has two entries** (#603: mood 2.0, no note; #609: mood 3.0 with a note). The diagram draws their
-  average. Delete one in the app.
 - **Restart the diary chat's Swing connection** to pick up the new MCP server (one entry per day, checked
   timestamps, tags, period tools).
 
@@ -20,15 +18,6 @@
 
 ## Decided, ready to start
 
-- **Pattern forming.** Agreed design in `docs/PATTERN_FORMING.md`: a dashed band and a "Day 3 of an elevated
-  run" caption for a run that hasn't reached full length yet; also reported by the MCP server. Small:
-  `EpisodeDetector` returns the open run, the diagram gets one more band style. Keep the Python copy in step.
-- **Markers on the diagram.** Hand-placed markers (date, label, kind: medication, appointment, other) drawn as a
-  dashed vertical line with a label at every scale. Clicking one shows the 30 days before and after (average,
-  days logged, days per band), worked out by the app and worded as what changed, not why. Added by right-click
-  on a day or from the entry panel. One new table; include markers in the MCP range tools; sync to the phone.
-- **Automatic backups before sync.** A dated copy of the database on launch (keep the last few). Export leaves
-  out period days and can't be imported back, and the sync work will restructure the database.
 - **iPhone port.** Plan in `docs/IOS_PORT_PLAN.md` (iPhone 15 Pro, sync through an iCloud Drive folder). Next is
   phase 0: spikes for free signing, SideStore refresh and the shared folder, plus a quick test of Apple's built-in
   model against diary text, and whether a free-signed app may read sleep from Apple Health.

@@ -93,8 +93,8 @@ around it.
 - **Import** — the toolbar Import menu reads three kinds of file, each
   shown in a review sheet before anything is saved. A Markdown diary (`.md`):
   dates and mood/flavour come from field lines (`Mood: 4.8. Flavour: 0.4`, one
-  per line or together) or are estimated from the text. A Swing export (`.csv`
-  or `.json`): entries come back as exported, with their day and tags (and
+  per line or together) or are estimated from the text. A CSV or JSON file
+  exported from Swing (`.csv` or `.json`): entries come back as exported, with their day and tags (and
   whether the tags were picked by hand); rows with a missing or out-of-range
   value are left out and counted. Days that already have an entry are skipped.
 - **Search** — the toolbar search field has two kinds of search, and every

@@ -30,7 +30,10 @@ struct MoodDiagramView: View {
     @Environment(\.cycleCalendar) private var cycle
     @State private var scale: DiagramScale = .week
     @State private var currentPage: Int?
-    @State private var magnifyAnchor: CGFloat = 1.0
+    /// Detected when the entries change (and when the app comes back, for a new day), not on every redraw: hovering
+    /// redraws the diagram often.
+    @State private var episodes: [EpisodeDetector.Episode] = []
+    @State private var forming: EpisodeDetector.Episode?
     /// The plotted point under the pointer, by its date; its card shows the day.
     @State private var hoveredDate: Date?
     /// Shows the card once the pointer has rested on a dot for `hoverDelay`, so passing over dots doesn't flash cards.
@@ -94,9 +97,6 @@ struct MoodDiagramView: View {
     }
 
     var body: some View {
-        // Detected once per render and clipped per page.
-        let episodes = EpisodeDetector.detect(entries: entries, calendar: calendar)
-        let forming = EpisodeDetector.forming(entries: entries, calendar: calendar)
         VStack(spacing: 4) {
             monthHeader(for: visiblePage)
 
@@ -127,6 +127,11 @@ struct MoodDiagramView: View {
                 .padding(.top, 8)
         }
         .gesture(pinchGesture)
+        .onAppear(perform: detectEpisodes)
+        .onChange(of: entries) { detectEpisodes() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            detectEpisodes()
+        }
         .onChange(of: scrollToDate) { _, date in
             guard let date else { return }
             let today = calendar.startOfDay(for: Date())
@@ -140,6 +145,12 @@ struct MoodDiagramView: View {
                 currentPage = max(0, min(weekPages - 1, weekPage))
             }
         }
+    }
+
+    /// Finds the episodes and the forming run, clipped per page when drawn.
+    private func detectEpisodes() {
+        episodes = EpisodeDetector.detect(entries: entries, calendar: calendar)
+        forming = EpisodeDetector.forming(entries: entries, calendar: calendar)
     }
 
     // MARK: - Page content
@@ -379,6 +390,7 @@ struct MoodDiagramView: View {
                     date: point.date,
                     isWeek: isWeek,
                     mood: point.mood,
+                    flavour: point.flavour,
                     low: point.low,
                     high: point.high,
                     label: MoodState.label(mood: point.mood, flavour: point.flavour, lens: lens,

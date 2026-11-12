@@ -16,8 +16,10 @@ Add to your Claude config (claude_desktop_config.json or .mcp.json):
 
 import json
 import math
+import re
 import sqlite3
 import os
+import unicodedata
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 try:
@@ -328,26 +330,41 @@ def delete_entry(entry_id: int) -> str:
     return f"Deleted entry #{entry_id}."
 
 
+def words(text: str | None) -> list[str]:
+    """The words of `text` as the app's search reads them: runs of letters, digits and inner apostrophes, lower case
+    and without accents (EntrySearch.tokens in the app)."""
+    folded = unicodedata.normalize("NFD", (text or "").replace("’", "'"))
+    folded = "".join(c for c in folded if not unicodedata.combining(c)).casefold()
+    return [w.strip("'") for w in re.findall(r"[\w']+", folded) if w.strip("'") and not w.strip("'").startswith("_")]
+
+
+def contains_phrase(text: str | None, phrase: list[str]) -> bool:
+    """Whether the phrase's words appear in the text as consecutive whole words."""
+    found = words(text)
+    return any(found[i:i + len(phrase)] == phrase for i in range(len(found) - len(phrase) + 1))
+
+
 @mcp.tool()
 def search_entries(query: str, limit: int = 20) -> str:
-    """Search entries by title or note text.
+    """Search entries by title or note text, newest first, as the app's quoted search does: whole words only,
+    ignoring case and accents, so "low" never finds "slow". Several words must appear together as a phrase.
 
     Args:
-        query: Text to search for in titles and notes
+        query: Word or phrase to search for in titles and notes
         limit: Max results (default 20)
     """
+    phrase = words(query)
+    if not phrase:
+        return "Error: give a word to search for"
     db = get_db()
-    rows = db.execute(
-        "SELECT * FROM moodEntry WHERE title LIKE ? OR note LIKE ? ORDER BY timestamp DESC LIMIT ?",
-        (f"%{query}%", f"%{query}%", limit),
-    ).fetchall()
+    rows = db.execute("SELECT * FROM moodEntry ORDER BY timestamp DESC").fetchall()
     db.close()
+    matches = [r for r in rows if contains_phrase(r["title"], phrase) or contains_phrase(r["note"], phrase)][:limit]
 
-    if not rows:
+    if not matches:
         return f"No entries matching '{query}'."
-
-    entries = [format_entry(row_to_dict(r)) for r in rows]
-    return f"{len(rows)} entries matching '{query}':\n\n" + "\n\n".join(entries)
+    entries = [format_entry(row_to_dict(r)) for r in matches]
+    return f"{len(matches)} entries matching '{query}':\n\n" + "\n\n".join(entries)
 
 
 @mcp.tool()

@@ -11,6 +11,8 @@ struct EditableImportEntry: Identifiable {
     var localDate: String? = nil
     var tags: [String] = []
     var tagModelVersion: String? = nil
+    /// The title as the file had it, so an edit in the review sheet can mark model tags out of date.
+    private var importedTitle: String = ""
 
     init(parsed: MarkdownImporter.ParsedEntry) {
         self.mood = parsed.mood
@@ -29,13 +31,17 @@ struct EditableImportEntry: Identifiable {
         self.localDate = entry.localDate
         self.tags = entry.tags
         self.tagModelVersion = entry.tagModelVersion
+        self.importedTitle = self.title
     }
 
-    /// The entry to save, keeping the recorded day and tags when the file had them.
+    /// The entry to save, keeping the recorded day and tags when the file had them. A title changed in the review
+    /// sheet marks model tags out of date, as the entry panel does; tags picked by hand stay.
     var moodEntry: MoodEntry {
-        MoodEntry(id: nil, mood: mood, flavour: flavour,
-                  title: title.isEmpty ? nil : title, note: note.isEmpty ? nil : note,
-                  timestamp: timestamp, localDate: localDate, tags: tags, tagModelVersion: tagModelVersion)
+        let retitled = title != importedTitle && tagModelVersion != MoodEntry.manualTagVersion
+        return MoodEntry(id: nil, mood: mood, flavour: flavour,
+                         title: title.isEmpty ? nil : title, note: note.isEmpty ? nil : note,
+                         timestamp: timestamp, localDate: localDate, tags: tags,
+                         tagModelVersion: retitled ? nil : tagModelVersion)
     }
 }
 

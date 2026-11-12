@@ -534,7 +534,7 @@ struct ContentView: View {
                 title: title, note: nil, timestamp: date
             )
             if (try? store.hasEntry(on: date)) == false {
-                try? store.save(entry)
+                _ = try? store.save(entry)
             }
         }
         reload()
@@ -655,9 +655,9 @@ enum ImportFormat: String, CaseIterable, Identifiable {
 
     var menuTitle: String {
         switch self {
-        case .markdown: "Markdown diary (.md)…"
-        case .csv: "Swing export (.csv)…"
-        case .json: "Swing export (.json)…"
+        case .markdown: "Import Markdown diary (.md)…"
+        case .csv: "Import CSV (.csv)…"
+        case .json: "Import JSON (.json)…"
         }
     }
 

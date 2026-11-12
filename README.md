@@ -93,8 +93,8 @@ around it.
 - **Import** — the toolbar Import menu reads three kinds of file, each
   shown in a review sheet before anything is saved. A Markdown diary (`.md`):
   dates and mood/flavour come from field lines (`Mood: 4.8. Flavour: 0.4`, one
-  per line or together) or are estimated from the text. A Swing export (`.csv`
-  or `.json`): entries come back as exported, with their day and tags (and
+  per line or together) or are estimated from the text. A CSV or JSON file
+  exported from Swing (`.csv` or `.json`): entries come back as exported, with their day and tags (and
   whether the tags were picked by hand); rows with a missing or out-of-range
   value are left out and counted. Days that already have an entry are skipped.
 - **Search** — the toolbar search field has two kinds of search, and every
@@ -220,7 +220,7 @@ Tools:
 | `list_recent_entries` | `count?` (default 10, max 100)                         | Newest entries first                     |
 | `get_entry`           | `entry_id`                                             | Full details of one entry, with tags     |
 | `delete_entry`        | `entry_id`                                             | Delete an entry                          |
-| `search_entries`      | `query`, `limit?` (default 20)                         | Search titles and notes                  |
+| `search_entries`      | `query`, `limit?` (default 20)                         | Whole-word search of titles and notes    |
 | `entries_for_date`    | `date` (`YYYY-MM-DD`)                                  | All entries for a day                    |
 | `mood_summary`        | `days?` (default 7)                                    | Average, range and count over a period   |
 | `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |

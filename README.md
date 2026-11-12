@@ -171,6 +171,12 @@ the toolbar menu opens the folder. To restore one, quit Swing and copy it over
 `moodbattery.sqlite`. Export leaves out period days and markers, so the
 backups are the only complete copies.
 
+A second copy goes off the Mac on every launch, into
+`iCloud Drive/Swing/database-backups` (`moodbattery-yyyy-MM-dd-HHmmss.sqlite`,
+newest 30 kept), if that folder exists. The path is fixed for now; a "pick your
+own backup folder" setting will replace it. "Show iCloud backups in Finder"
+opens it.
+
 Table `periodStart` holds one `localDate` (`yyyy-MM-dd`, primary key) per
 logged period start, for the PMDD lens. Table `marker` holds the diagram
 markers: `id`, `localDate`, `label`, and `kind` (`medication`,

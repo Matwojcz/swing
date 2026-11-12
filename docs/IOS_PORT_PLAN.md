@@ -107,3 +107,6 @@ tags (same editor, up to four), period start in the PMDD lens, delete.
 - Phone: iPhone 15 Pro (A17 Pro, 8 GB RAM), latest iOS. Enough for Gemma 4 E2B if the memory entitlement works.
 - Sync: Option A, the shared iCloud Drive folder.
 - v1.2 isn't released yet: search needs tightening first.
+- Backups (12 Nov 2026): Swing copies the database to `iCloud Drive/Swing/database-backups` on every launch, at a
+  fixed path for now. Before going cross-platform this becomes a "pick your own backup folder" setting, shared
+  with the sync folder choice, since other platforms and other people won't have that path.

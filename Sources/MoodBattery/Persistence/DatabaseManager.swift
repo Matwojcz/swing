@@ -7,9 +7,14 @@ final class DatabaseManager {
     let dbQueue: DatabaseQueue
     /// Where the daily backups go: `Backups` next to the app's own database, nil for a database at a given path.
     let backupDirectory: URL?
+    /// The copy off this Mac, made on every launch: `iCloud Drive/Swing/database-backups`. Nil for a database at a
+    /// given path. Only used while the folder exists, so switching iCloud Drive off just stops these copies.
+    let iCloudBackupDirectory: URL?
 
     /// Daily backups kept; older ones are deleted.
     static let backupsToKeep = 14
+    /// Launch copies kept in iCloud Drive; older ones are deleted.
+    static let iCloudBackupsToKeep = 30
 
     /// Opens (or creates) the SQLite database at the given path, defaulting to the app's Application Support directory,
     /// backs up the app's own database once a day, and runs pending migrations (after the backup, so a migration that
@@ -19,6 +24,7 @@ final class DatabaseManager {
         if let path {
             dbPath = path
             backupDirectory = nil
+            iCloudBackupDirectory = nil
         } else {
             let fileManager = FileManager.default
             let appSupportURL = try fileManager.url(
@@ -31,12 +37,66 @@ final class DatabaseManager {
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
             dbPath = directoryURL.appendingPathComponent("moodbattery.sqlite").path
             backupDirectory = directoryURL.appendingPathComponent("Backups", isDirectory: true)
+            iCloudBackupDirectory = fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Swing/database-backups", isDirectory: true)
         }
 
         dbQueue = try DatabaseQueue(path: dbPath)
         backUpIfDue()
+        backUpToICloud()
         try Self.migrator.migrate(dbQueue)
     }
+
+    /// Copies the database into `iCloudBackupDirectory` as `moodbattery-yyyy-MM-dd-HHmmss.sqlite`, then keeps only
+    /// the newest `iCloudBackupsToKeep`. Called once per launch. The copy is written next to the database first and
+    /// moved in when complete, so iCloud never uploads a half-written file. Never stops the app: a failure is
+    /// reported in the console.
+    func backUpToICloud(now: Date = Date()) {
+        guard let iCloudBackupDirectory, let backupDirectory else { return }
+        let fileManager = FileManager.default
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: iCloudBackupDirectory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            print("[DatabaseManager] No iCloud backup: \(iCloudBackupDirectory.path) doesn't exist")
+            return
+        }
+        do {
+            let stamp = Self.launchStampFormatter.string(from: now)
+            let target = iCloudBackupDirectory.appendingPathComponent("moodbattery-\(stamp).sqlite")
+            guard !fileManager.fileExists(atPath: target.path) else { return }
+
+            try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+            let partial = backupDirectory.appendingPathComponent("in-progress-icloud.sqlite")
+            try? fileManager.removeItem(at: partial)
+            let destination = try DatabaseQueue(path: partial.path)
+            try dbQueue.backup(to: destination)
+            try destination.close()
+            try fileManager.moveItem(at: partial, to: target)
+
+            Self.prune(iCloudBackupDirectory, keeping: Self.iCloudBackupsToKeep)
+        } catch {
+            print("[DatabaseManager] iCloud backup failed: \(error)")
+        }
+    }
+
+    /// Deletes all but the newest `count` backups (`moodbattery-….sqlite`) in `directory`; other files are left alone.
+    private static func prune(_ directory: URL, keeping count: Int) {
+        let fileManager = FileManager.default
+        guard let files = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        let backups = files
+            .filter { $0.lastPathComponent.hasPrefix("moodbattery-") && $0.pathExtension == "sqlite" }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+        for old in backups.dropFirst(count) {
+            try? fileManager.removeItem(at: old)
+        }
+    }
+
+    /// Sorts the same as the date it names, so pruning by name keeps the newest.
+    private static let launchStampFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return f
+    }()
 
     /// Copies the database to `Backups/moodbattery-yyyy-MM-dd.sqlite` unless today's copy exists, then keeps only the
     /// newest `backupsToKeep`. Export leaves out period days and markers and can't be read back in, so these copies are
@@ -57,13 +117,7 @@ final class DatabaseManager {
             try dbQueue.backup(to: destination)
             try destination.close()
             try fileManager.moveItem(at: partial, to: target)
-
-            let backups = try fileManager.contentsOfDirectory(at: backupDirectory, includingPropertiesForKeys: nil)
-                .filter { $0.lastPathComponent.hasPrefix("moodbattery-") && $0.pathExtension == "sqlite" }
-                .sorted { $0.lastPathComponent > $1.lastPathComponent }
-            for old in backups.dropFirst(Self.backupsToKeep) {
-                try? fileManager.removeItem(at: old)
-            }
+            Self.prune(backupDirectory, keeping: Self.backupsToKeep)
         } catch {
             print("[DatabaseManager] Backup failed: \(error)")
         }

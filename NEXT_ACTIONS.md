@@ -22,6 +22,14 @@
   phase 0: spikes for free signing, SideStore refresh and the shared folder, plus a quick test of Apple's built-in
   model against diary text, and whether a free-signed app may read sleep from Apple Health.
 
+- **Pick your own backup folder (setting in the app).** The second backup copy goes to a fixed path for now,
+  `iCloud Drive/Swing/database-backups`, which only exists on a Mac with iCloud Drive. Before the cross-platform
+  work (iPhone, Android, other people using Swing), replace it with a "Choose backup folder…" setting that
+  remembers the folder (a security-scoped bookmark, so it also works sandboxed), shows where copies go and when
+  the last one was made, and can be turned off. It should share the folder choice with sync, which needs the
+  same kind of user-picked folder (`docs/IOS_PORT_PLAN.md`). Until then the path is in
+  `DatabaseManager.iCloudBackupDirectory`.
+
 ## Ideas, not decided
 
 - Quick check-ins on the phone (several per day, the day drawn as a range). Changes the one-entry-per-day model.

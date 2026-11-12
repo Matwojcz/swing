@@ -267,7 +267,8 @@ struct ContentView: View {
                 Menu {
                     Button("Export as CSV") { exportCSV() }
                     Button("Export as JSON") { exportJSON() }
-                    Button("Show backups in Finder") { showBackups() }
+                    Button("Show backups in Finder") { showBackups(in: DatabaseManager.shared.backupDirectory) }
+                    Button("Show iCloud backups in Finder") { showBackups(in: DatabaseManager.shared.iCloudBackupDirectory) }
                     Divider()
                     #if DEBUG
                     Button("Seed 6 months of dummy data") { seedDummyData() }
@@ -574,10 +575,12 @@ struct ContentView: View {
         reload()
     }
 
-    /// Opens the folder of daily database backups.
-    private func showBackups() {
-        guard let directory = DatabaseManager.shared.backupDirectory else { return }
-        DatabaseManager.shared.backUpIfDue()
+    /// Opens a folder of database backups, or says why it can't.
+    private func showBackups(in directory: URL?) {
+        guard let directory, FileManager.default.fileExists(atPath: directory.path) else {
+            saveError = "The backup folder \(directory?.path ?? "") doesn't exist."
+            return
+        }
         NSWorkspace.shared.activateFileViewerSelecting([directory])
     }
 

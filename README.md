@@ -1,6 +1,6 @@
 # Swing
 
-**v1.2.3**
+**v1.3**
 
 A personal, visual mood tracker for macOS. Not a clinical tool — a way to
 log and reflect on mood state over time. Labels use neutral everyday words
@@ -30,7 +30,8 @@ mood (0-10, in 0.1 steps):
 
 Each entry is saved with an optional title and free-text note. The history
 list shows all entries with mood-colored indicators, and a diagram plots
-your mood over time across week, month, and year scales.
+your mood over time across week, month, and year scales, with detected
+episodes, a run that is forming, and markers you place by hand.
 
 ## Features
 
@@ -61,8 +62,9 @@ your mood over time across week, month, and year scales.
   describes what changed around the date, never why. Edit or delete it there.
 - **Entry detail panel** — tap any entry to view and inline-edit all
   fields (double-click mood, flavour, title, note, or the tags). Shows the
-  entry's tags, an Auto-tag button, and (in the PMDD lens) a "Period started
-  on this day" checkbox. Delete entries here.
+  entry's tags, an Auto-tag button, a flag button to add a diagram marker on
+  that day, and (in the PMDD lens) a "Period started on this day" checkbox.
+  Delete entries here.
 - **On-device AI tagging** — Gemma 4 E2B, run locally through llama.cpp,
   reads an entry's title and note and picks up to four tags from a fixed list
   of feelings (low, flat, anxious, calm, hopeful, energised…): one or two for
@@ -105,9 +107,10 @@ your mood over time across week, month, and year scales.
   row shows why it matched (an outlined tag, a highlighted title, or the
   matching line of the note or band name), and the detail panel highlights the
   same. Up/down arrows step through the matches, Return jumps to the newest one.
-- **Data export** — export all entries (with their tags) as CSV or JSON from
-  the toolbar menu, which also has "Clear all entries". Debug builds add a
-  dummy-data seeder there.
+- **Data export and backups** — export all entries (with their tags) as CSV or
+  JSON from the toolbar menu, which also opens the two backup folders (see
+  Database) and has "Clear all entries". Debug builds add a dummy-data
+  seeder there.
 - **MCP server** — Python server for Claude integration (log, query,
   update, delete entries; exact numbers, tags and episodes for a period).
   The app reads the diary again whenever you return to it, and an edit

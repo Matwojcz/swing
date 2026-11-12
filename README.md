@@ -114,7 +114,7 @@ around it.
   same. Up/down arrows step through the matches, Return jumps to the newest one.
 - **Data export and backups** — export all entries (with their tags and where
   the tags came from) as CSV or JSON from the toolbar menu; Import reads both
-  back. The same menu which also opens the two backup folders (see
+  back. The same menu also opens the two backup folders (see
   Database) and has "Clear all entries". Debug builds add a dummy-data
   seeder there.
 - **MCP server** — Python server for Claude integration (log, query,

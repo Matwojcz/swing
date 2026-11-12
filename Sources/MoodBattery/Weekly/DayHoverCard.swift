@@ -7,6 +7,7 @@ struct DayHoverCard: View {
     /// On the year scale a dot is a week's average.
     let isWeek: Bool
     let mood: Double
+    let flavour: Double
     /// The week's lowest and highest day, on the year scale.
     var low: Double? = nil
     var high: Double? = nil
@@ -43,7 +44,7 @@ struct DayHoverCard: View {
                     .monospacedDigit()
                 Text(label)
                     .font(.system(size: 11))
-                    .foregroundStyle(MoodColor.color(mood: mood, flavour: 0.3))
+                    .foregroundStyle(MoodColor.color(mood: mood, flavour: flavour))
                     .lineLimit(1)
             }
             if isWeek, let low, let high {
@@ -86,7 +87,7 @@ struct DayHoverCard: View {
 }
 
 #Preview {
-    DayHoverCard(date: Date(), isWeek: false, mood: 3.6, label: "dipping", tags: [.low, .foggy, .flat],
+    DayHoverCard(date: Date(), isWeek: false, mood: 3.6, flavour: 0.4, label: "dipping", tags: [.low, .foggy, .flat],
                  record: .init(kind: .lowest, since: Calendar.current.date(byAdding: .day, value: -20, to: Date()), tiedWith: nil))
         .frame(width: 230)
         .padding()

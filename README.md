@@ -220,7 +220,7 @@ Tools:
 | `list_recent_entries` | `count?` (default 10, max 100)                         | Newest entries first                     |
 | `get_entry`           | `entry_id`                                             | Full details of one entry, with tags     |
 | `delete_entry`        | `entry_id`                                             | Delete an entry                          |
-| `search_entries`      | `query`, `limit?` (default 20)                         | Search titles and notes                  |
+| `search_entries`      | `query`, `limit?` (default 20)                         | Whole-word search of titles and notes    |
 | `entries_for_date`    | `date` (`YYYY-MM-DD`)                                  | All entries for a day                    |
 | `mood_summary`        | `days?` (default 7)                                    | Average, range and count over a period   |
 | `entries_in_range`    | `start`, `end?` (default today), `full_notes?`         | Every entry in a period, whole notes     |

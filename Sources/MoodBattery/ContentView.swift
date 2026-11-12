@@ -534,7 +534,7 @@ struct ContentView: View {
                 title: title, note: nil, timestamp: date
             )
             if (try? store.hasEntry(on: date)) == false {
-                try? store.save(entry)
+                _ = try? store.save(entry)
             }
         }
         reload()

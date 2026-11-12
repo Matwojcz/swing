@@ -29,7 +29,8 @@ enum ExportFileImporter {
     /// name, so their order doesn't matter and older exports without the last columns still read; `id` is ignored,
     /// since the entries get new ones. Tags are `;`-separated.
     static func entries(fromCSV text: String) throws -> Result {
-        let rows = csvRows(text)
+        // Excel and Numbers start a saved CSV with a byte-order mark, which would stick to the first column's name.
+        let rows = csvRows(text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text)
         guard let header = rows.first?.map({ $0.trimmingCharacters(in: .whitespaces).lowercased() }) else {
             return Result(entries: [], skipped: 0)
         }

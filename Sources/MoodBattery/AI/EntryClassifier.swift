@@ -3,7 +3,7 @@ import Foundation
 /// Abstraction over whatever assigns mood tags to an entry's text.
 ///
 /// The app depends on this protocol, never on a particular model or runtime, so the on-device
-/// LLM (llama.cpp + Qwen) can be swapped in without touching the UI or persistence — and a future
+/// LLM (llama.cpp + Gemma 4 E2B) can be swapped in without touching the UI or persistence — and a future
 /// Windows port supplies its own conformance over the same llama.cpp core. This is the
 /// cross-platform boundary from the plan.
 protocol EntryClassifier {

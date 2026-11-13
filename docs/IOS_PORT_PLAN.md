@@ -51,8 +51,20 @@ there's no off-Mac backup.
 
 **Either way the database needs, per entry:** a stable ID that's the same on both devices (a UUID column;
 today's numeric ID is per database), an "updated at" time, and deletions kept as markers rather than
-removed rows. Same for period start days. Conflict rule: the most recent edit of an entry wins. Swing has
-one entry per day, so if both devices log the same day before syncing, keep the later one and say so.
+removed rows. Same for period start days and diagram markers (the `marker` table, added after this plan
+was first written). Conflict rule: the most recent edit of an entry wins. Swing has one entry per day, so
+if both devices log the same day before syncing, keep the later one and say so **on both devices**: the
+one whose entry was replaced and the one that kept its entry.
+
+**iCloud files may not be on the device.** iOS (and macOS with "Optimise Mac Storage") keeps iCloud Drive
+files as placeholders until something asks for them. The sync must ask iCloud to download the other
+devices' change files and read them through a file coordinator, which waits for the download, or it will
+read a stale or missing file. Checked in the Phase 0 spike.
+
+**Change files only grow.** Each save appends a line and none are removed, so a file keeps every old
+version and every deletion marker. For Swing (one entry a day) that stays small for years, a few MB at
+most, so this isn't urgent. When needed, a device writes a snapshot of the current state and starts a
+fresh change file. Name the files so a new generation can follow (e.g. `<device>-<n>.jsonl`).
 
 ## 3. Code layout
 
@@ -95,10 +107,16 @@ tags (same editor, up to four), period start in the PMDD lens, delete.
 
 0. **Spikes (one session).** A throwaway iOS app signed with the free team that opens a GRDB database;
    installed and refreshed through SideStore; picks an iCloud Drive folder, keeps access after a relaunch,
-   and writes a file the Mac can see. Settles section 1 and Option A before any real work.
-1. **Shared core.** Move the code into `SwingCore`; the Mac app behaves exactly as before (a 1.2.x release).
-2. **Sync, Mac side.** Database migration (UUIDs, updated-at, deletion markers), the change files, merging.
-   Tested with two copies of the database on the Mac before any phone is involved.
+   writes a file the Mac can see, and reads the Mac's file even when iCloud hasn't downloaded it to the phone.
+   Settles section 1 and Option A before any real work. Built: `Spikes/iOSPhase0` (steps and checklist in its
+   README).
+1. **Shared core.** Move the code into `SwingCore`; the Mac app behaves exactly as before (a 1.5 release).
+   `Models/`, `Persistence/` and `AI/` already have no AppKit code, so this is mostly moving files; the Mac-only
+   code is all in views (`ContentView`, the History views, `LensTurret`, `Color+Theme`, the diagram).
+2. **Sync, Mac side.** Database migration (UUIDs, updated-at, deletion markers) for entries, period starts and
+   diagram markers; the change files; merging; the same-day conflict notice. A "pick your sync folder" setting
+   that also replaces the fixed backup path. Tested with two copies of the database on the Mac before any
+   phone is involved.
 3. **iPhone app.** Log, history, search, entry sheet, lenses, manual tags, sync. On your phone via SideStore.
 4. **Tagging on the phone.** Model download, memory check, then Gemma on device.
 

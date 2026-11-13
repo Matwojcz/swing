@@ -1,0 +1,38 @@
+# Throwaway Phase 0 spike for the iPhone port. Separate from the Mac project on purpose.
+# `xcodegen generate` here, then build — see README.md.
+name: SwingSpike
+options:
+  bundleIdPrefix: com.matwojcz
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift.git
+    from: 7.0.0
+targets:
+  SwingSpike:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - package: GRDB
+        product: GRDB
+    settings:
+      base:
+        # Same bundle ID the real iPhone app will use, so the spike doesn't spend an extra
+        # free-team app ID (they're limited per week).
+        PRODUCT_BUNDLE_IDENTIFIER: com.matwojcz.SwingPhone
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        DEVELOPMENT_TEAM: FKRP65847F
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Swing Spike
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen: {}
